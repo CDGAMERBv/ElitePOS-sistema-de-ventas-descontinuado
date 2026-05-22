@@ -1,0 +1,360 @@
+@page "/sunat"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Client.Services
+@using Microsoft.AspNetCore.Components.Forms
+@inject IConfiguracionSunatService SunatService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+
+<style>
+    /* ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ BOTï¿½"N PREMIUM ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ */
+    .btn-guardar-premium {
+        padding: 12px 28px;
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-weight: 700;
+        font-size: 15px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
+    .btn-guardar-premium:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(16, 185, 129, 0.4);
+    }
+    
+    .btn-guardar-premium:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
+    }
+
+    /* ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ SWITCH PREMIUM ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ */
+    .custom-switch {
+        margin: 0;
+        padding-left: 0;
+        display: flex;
+        align-items: center;
+    }
+
+    .custom-switch .switch-premium {
+        width: 48px;
+        height: 26px;
+        margin: 0;
+        cursor: pointer;
+        background-color: #eab308; /* Beta/Homologación Color */
+        border: none;
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        transition: all 0.25s ease;
+    }
+
+    .custom-switch .switch-premium:checked {
+        background-color: #10b981; /* Producción Color */
+        box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .custom-switch .switch-premium:focus {
+        box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+    }
+
+    /* ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ EMPTY STATE ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ */
+    .empty-state {
+        padding: 80px 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: #6b7280;
+        background: white;
+        border-radius: 16px;
+        border: 2px dashed #e5e7eb;
+        margin-top: 16px;
+    }
+
+    .empty-icon-bi {
+        font-size: 64px;
+        color: #d1d5db;
+        display: block;
+        margin-bottom: 20px;
+    }
+
+    /* ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ UPLOAD BUTTON ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ */
+    .btn-upload {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 20px;
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        color: white;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+    }
+    
+    .btn-upload:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(99, 102, 241, 0.4);
+    }
+</style>
+
+<div style="min-height: 100vh; background: #f0f2f5; padding: 20px;">
+    
+    <!-- HEADER: siempre visible, independiente de la carga -->
+    <div style="max-width: 900px; margin: 0 auto 24px auto; display: flex; align-items: center; gap: 16px;">
+        <button @onclick="Volver" style="padding: 10px 16px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; color: #6b7280; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+            <i class="bi bi-arrow-left"></i>
+            Volver
+        </button>
+        <div style="flex: 1;">
+            <h1 style="font-size: 28px; font-weight: 800; color: #1a1a1a; margin: 0;">Configuración SUNAT</h1>
+            <p style="font-size: 14px; color: #6b7280; font-weight: 500; margin: 4px 0 0 0;">Configura la facturación electrónica</p>
+        </div>
+    </div>
+
+    @if (_cargando)
+    {
+        <div class="elite-spinner-wrap">
+            <div class="elite-spinner"></div>
+            <p class="elite-spinner-text">Cargando configuración SUNAT...</p>
+        </div>
+    }
+    else
+    {
+    <EditForm Model="configuracion" OnValidSubmit="GuardarConfiguracion" style="max-width: 900px; margin: 0 auto;">
+
+        <!-- MODO DE ENVÍO -->
+        <div class="card-elite">
+
+            <h2 style="font-size: 18px; font-weight: 700; color: #1a1a1a; margin: 0 0 24px 0; padding-bottom: 16px; border-bottom: 2px solid #f3f4f6; display: flex; align-items: center; gap: 10px;">
+                <i class="bi bi-hdd-network"></i>
+                Modo de Operación
+            </h2>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; background: #f8fafc; border-radius: 12px; border: 1px solid #f1f5f9;">
+                <label for="switch-entorno" style="font-size: 15px; font-weight: 700; color: #111827; cursor: pointer; margin: 0; display: flex; flex-direction: column; gap: 4px;">
+                    Entorno de Facturación
+                    <small style="font-size: 13px; color: #64748b; font-weight: 500;">
+                        @(EsProduccion ? "Los documentos se envían oficialmente a SUNAT" : "Los documentos no tienen validez legal")
+                    </small>
+                </label>
+                
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-size: 13px; font-weight: 700; color: @(EsProduccion ? "#9ca3af" : "#eab308");">Homologación</span>
+                    <div class="form-check form-switch custom-switch">
+                        <input class="form-check-input switch-premium" type="checkbox" role="switch" id="switch-entorno" @bind="EsProduccion" />
+                    </div>
+                    <span style="font-size: 13px; font-weight: 700; color: @(EsProduccion ? "#10b981" : "#9ca3af");">Producción</span>
+                </div>
+            </div>
+            
+            <!-- Banner Informativo -->
+            <div style="margin-top: 16px; padding: 16px; background: @(EsProduccion ? "#ecfdf5" : "#fefce8"); border-radius: 12px; border: 1px solid @(EsProduccion ? "#a7f3d0" : "#fef08a"); display: flex; align-items: center; gap: 12px;">
+                <i class="bi @(EsProduccion ? "bi-shield-check" : "bi-cone-striped")" style="font-size: 24px; color: @(EsProduccion ? "#10b981" : "#eab308");"></i>
+                <div>
+                    <h4 style="margin: 0; font-size: 14px; font-weight: 700; color: @(EsProduccion ? "#065f46" : "#854d0e");">
+                        @(EsProduccion ? "Modo Producción (Envío real a SUNAT)" : "Modo Homologación (Pruebas - Sin valor legal)")
+                    </h4>
+                    <p style="margin: 4px 0 0 0; font-size: 13px; color: @(EsProduccion ? "#047857" : "#a16207");">
+                        @(EsProduccion ? "Estás operando en el entorno real de SUNAT." : "Estás operando en un entorno de pruebas seguro.")
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- CREDENCIALES DE LA API -->
+        <div class="card-elite">
+
+            <h2 style="font-size: 18px; font-weight: 700; color: #1a1a1a; margin: 0 0 24px 0; padding-bottom: 16px; border-bottom: 2px solid #f3f4f6; display: flex; align-items: center; gap: 10px;">
+                <i class="bi bi-cloud-arrow-up"></i>
+                Credenciales de la API
+            </h2>
+
+            <!-- URL de la API -->
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px;">
+                    URL de la API
+                </label>
+                <div style="position: relative;">
+                    <i class="bi bi-link-45deg text-muted" style="position: absolute; left: 16px; top: 12px; font-size: 16px;"></i>
+                    <input type="text" @bind-value="configuracion.apiUrl"
+                           placeholder="https://api.pse.pe/v1"
+                           style="width: 100%; padding: 12px 16px 12px 42px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; background: white;" />
+                </div>
+                <ValidationMessage For="@(() => configuracion.apiUrl)" style="color: #ef4444; font-size: 12px; margin-top: 4px;" />
+            </div>
+
+            <!-- Token de Autorización -->
+            <div style="margin-bottom: 0;">
+                <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px;">
+                    Token de Autorización
+                </label>
+                <div style="position: relative;">
+                    <i class="bi bi-shield-lock text-muted" style="position: absolute; left: 16px; top: 12px; font-size: 16px;"></i>
+                    <input type="password" @bind-value="configuracion.apiToken"
+                           placeholder="Ingresa tu Bearer Token"
+                           style="width: 100%; padding: 12px 16px 12px 42px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; background: white;" />
+                </div>
+                <ValidationMessage For="@(() => configuracion.apiToken)" style="color: #ef4444; font-size: 12px; margin-top: 4px;" />
+            </div>
+        </div>
+
+        <!-- DATOS DE LA EMPRESA -->
+        <div class="card-elite">
+
+            <h2 style="font-size: 18px; font-weight: 700; color: #1a1a1a; margin: 0 0 24px 0; padding-bottom: 16px; border-bottom: 2px solid #f3f4f6; display: flex; align-items: center; gap: 10px;">
+                <i class="bi bi-building"></i>
+                Datos de la Empresa
+            </h2>
+            
+            <!-- RUC Emisor -->
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px;">
+                    RUC de la Empresa Emisora
+                </label>
+                <div style="position: relative;">
+                    <i class="bi bi-person-badge text-muted" style="position: absolute; left: 16px; top: 12px; font-size: 16px;"></i>
+                    <input type="text" @bind-value="configuracion.ruc"
+                           placeholder="Ingresa el RUC (11 dígitos)"
+                           style="width: 100%; padding: 12px 16px 12px 42px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; background: white;" />
+                </div>
+                <ValidationMessage For="@(() => configuracion.ruc)" style="color: #ef4444; font-size: 12px; margin-top: 4px;" />
+            </div>
+
+            <div style="display: flex; gap: 20px;">
+                <!-- Serie Boleta -->
+                <div style="flex: 1;">
+                    <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px;">
+                        Serie de Boleta por Defecto
+                    </label>
+                    <div style="position: relative;">
+                        <i class="bi bi-receipt text-muted" style="position: absolute; left: 16px; top: 12px; font-size: 16px;"></i>
+                        <input type="text" @bind-value="configuracion.serieBoleta"
+                               placeholder="Ej: B001"
+                               style="width: 100%; padding: 12px 16px 12px 42px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; background: white; text-transform: uppercase;" />
+                    </div>
+                    <ValidationMessage For="@(() => configuracion.serieBoleta)" style="color: #ef4444; font-size: 12px; margin-top: 4px;" />
+                </div>
+
+                <!-- Serie Factura -->
+                <div style="flex: 1;">
+                    <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px;">
+                        Serie de Factura por Defecto
+                    </label>
+                    <div style="position: relative;">
+                        <i class="bi bi-file-earmark-text text-muted" style="position: absolute; left: 16px; top: 12px; font-size: 16px;"></i>
+                        <input type="text" @bind-value="configuracion.serieFactura"
+                               placeholder="Ej: F001"
+                               style="width: 100%; padding: 12px 16px 12px 42px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; background: white; text-transform: uppercase;" />
+                    </div>
+                    <ValidationMessage For="@(() => configuracion.serieFactura)" style="color: #ef4444; font-size: 12px; margin-top: 4px;" />
+                </div>
+            </div>
+        </div>
+
+        <!-- FEEDBACK GUARDADO -->
+        @if (!string.IsNullOrEmpty(mensajeFeedback))
+        {
+            <div style="margin-bottom: 24px; padding: 16px; border-radius: 12px; background: @(esExitoFeedback ? "#ecfdf5" : "#fef2f2"); border: 1px solid @(esExitoFeedback ? "#a7f3d0" : "#fecaca");">
+                <p style="margin: 0; font-size: 14px; font-weight: 600; color: @(esExitoFeedback ? "#065f46" : "#991b1b"); display: flex; align-items: center; gap: 8px;">
+                    <i class="bi @(esExitoFeedback ? "bi-check-circle-fill" : "bi-exclamation-octagon-fill")"></i>
+                    @mensajeFeedback
+                </p>
+            </div>
+        }
+
+        <!-- BOTï¿½"N GUARDAR -->
+        <div style="display: flex; justify-content: flex-end;">
+            <button type="submit" class="btn-guardar-premium" disabled="@guardando">
+                <i class="bi bi-check-lg"></i>
+                @(guardando ? "Guardando..." : "Guardar Cambios")
+            </button>
+        </div>
+    </EditForm>
+    }
+</div>
+
+@code {
+    private ConfiguracionSunatModel configuracion = new();
+    private bool guardando = false;
+    private bool _cargando = true;
+    private string mensajeFeedback = "";
+    private bool esExitoFeedback = false;
+
+    // Propiedad calculada para el Switch Toggle
+    private bool EsProduccion
+    {
+        get => configuracion.modo == "PRODUCCION";
+        set => configuracion.modo = value ? "PRODUCCION" : "BETA";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        configuracion = await SunatService.ObtenerConfiguracion();
+        _cargando = false;
+    }
+
+    private async Task GuardarConfiguracion()
+    {
+        if (guardando) return;
+
+        try
+        {
+            guardando = true;
+            mensajeFeedback = string.Empty;
+            
+            // Sanitización
+            configuracion.apiUrl = configuracion.apiUrl?.Trim() ?? string.Empty;
+            configuracion.apiToken = configuracion.apiToken?.Trim() ?? string.Empty;
+            configuracion.ruc = configuracion.ruc?.Trim() ?? string.Empty;
+            configuracion.serieBoleta = configuracion.serieBoleta?.Trim().ToUpper() ?? string.Empty;
+            configuracion.serieFactura = configuracion.serieFactura?.Trim().ToUpper() ?? string.Empty;
+
+            StateHasChanged();
+
+            var success = await SunatService.GuardarConfiguracion(configuracion);
+            if (success)
+            {
+                esExitoFeedback = true;
+                mensajeFeedback = "¡Configuración guardada con éxito!";
+            }
+            else
+            {
+                esExitoFeedback = false;
+                mensajeFeedback = "Error al intentar guardar los datos en el servidor.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al guardar configuración SUNAT: {ex.Message}");
+            esExitoFeedback = false;
+            mensajeFeedback = $"Se produjo una excepción inesperada: {ex.Message}";
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/configuracion");
+    }
+}
+
+
+
+
+
+
+

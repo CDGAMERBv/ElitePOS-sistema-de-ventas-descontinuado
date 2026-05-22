@@ -1,0 +1,145 @@
+@page "/reportes/kardex"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Services
+@using ElitePOS.Client.Services
+@inject IKardexService KardexService
+@inject IInventarioService InventarioService
+@inject IConfiguracionAlmacenesService AlmacenesService
+@inject ISesionService SesionService
+@inject NavigationManager NavigationManager
+@inject GestionStateService StateService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<style>
+    .k-page { min-height: 100vh; background: #f8fafc; padding: 24px; }
+    .k-card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+    .search-wrapper { position: relative; }
+    .v-suggestions {
+        position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+        background: white; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+        z-index: 1000; max-height: 300px; overflow-y: auto; border: 1px solid #e5e7eb;
+    }
+    .v-sug-item { padding: 10px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
+    .v-sug-item:hover { background: #f8fafc; }
+</style>
+
+<div class="k-page">
+    <div style="max-width: 1200px; margin: 0 auto;">
+        
+        <div style="margin-bottom: 32px;">
+            <button @onclick='() => NavigationManager.NavigateTo("/reportes")' class="btn btn-sm btn-outline-secondary mb-3">
+                <i class="bi bi-arrow-left me-2"></i> Volver a Reportes
+            </button>
+            <h1 style="font-size: 28px; font-weight: 800; color: #1e293b; margin: 0;">Reporte de Kardex</h1>
+            <p style="color: #64748b; margin: 4px 0 0 0;">Visualiza el flujo de inventario por producto</p>
+        </div>
+
+        <div class="k-card" style="margin-bottom: 24px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; align-items: flex-end;">
+                <div class="search-wrapper">
+                    <label style="font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; display: block;">PRODUCTO</label>
+                    <input class="form-control" placeholder="Buscar producto..." @bind="_searchTerm" @bind:event="oninput" @onfocus="() => _showDropdown = true" @onfocusout="HandleFocusOut" />
+                    @if (_showDropdown && _productosFiltered.Any())
+                    {
+                        <div class="v-suggestions">
+                            @foreach (var p in _productosFiltered.Take(10))
+                            {
+                                <div class="v-sug-item" @onclick="() => SeleccionarProducto(p)">
+                                    <div style="font-weight: 600;">@p.nombre</div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+                <div><label style="font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; display: block;">DESDE</label><input type="date" class="form-control" @bind="_fechaInicio" /></div>
+                <div><label style="font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; display: block;">HASTA</label><input type="date" class="form-control" @bind="_fechaFin" /></div>
+                <button class="btn btn-primary" style="font-weight: 700;" @onclick="ConsultarKardex" disabled="@isConsultando">
+                    @if (isConsultando) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                    CONSULTAR
+                </button>
+            </div>
+        </div>
+
+        @if (_busquedaRealizada)
+        {
+            <div class="k-card" style="padding: 0; overflow: hidden;">
+                <table class="table table-hover mb-0" style="font-size: 13px;">
+                    <thead class="bg-light">
+                        <tr>
+                            <th style="padding: 16px;">Fecha / Hora</th>
+                            <th style="padding: 16px;">Concepto</th>
+                            <th style="padding: 16px; text-align: center;">Entrada</th>
+                            <th style="padding: 16px; text-align: center;">Salida</th>
+                            <th style="padding: 16px; text-align: right;">Saldo Actual</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in movimientos)
+                        {
+                            <tr>
+                                <td style="padding: 16px;">@m.fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td style="padding: 16px; font-weight: 600;">@m.concepto</td>
+                                <td style="padding: 16px; text-align: center;">
+                                    @if(m.tipoMovimiento?.ToUpper() == "ENTRADA" || m.tipoMovimiento?.ToUpper() == "COMPRA") { 
+                                        <span class="text-success font-weight-bold">+@m.cantidad</span> 
+                                    }
+                                </td>
+                                <td style="padding: 16px; text-align: center;">
+                                    @if(m.tipoMovimiento?.ToUpper() == "SALIDA" || m.tipoMovimiento?.ToUpper() == "VENTA") { 
+                                        <span class="text-danger font-weight-bold">-@m.cantidad</span> 
+                                    }
+                                </td>
+                                <td style="padding: 16px; text-align: right; font-weight: 800;">@m.saldoActual</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool isConsultando = false;
+    private bool _busquedaRealizada = false;
+    private bool _showDropdown = false;
+    private string _filtroproductoId = "";
+    private DateTime _fechaInicio = DateTime.Today.AddDays(-30);
+    private DateTime _fechaFin = DateTime.Today;
+    private string _searchTerm = "";
+    private List<ProductoModel> _productosCatalogo = new();
+    private List<ProductoModel> _productosFiltered => string.IsNullOrWhiteSpace(_searchTerm) ? _productosCatalogo : _productosCatalogo.Where(p => p.nombre.Contains(_searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+    private List<MovimientoKardexModel> movimientos = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        StateService.OnChange += StateHasChanged;
+        _productosCatalogo = (await InventarioService.ObtenerProductos()).ToList();
+    }
+
+    private void SeleccionarProducto(ProductoModel p)
+    {
+        _filtroproductoId = p.id;
+        _searchTerm = p.nombre;
+        _showDropdown = false;
+    }
+
+    private async Task HandleFocusOut() { await Task.Delay(200); _showDropdown = false; StateHasChanged(); }
+
+    private async Task ConsultarKardex()
+    {
+        if (string.IsNullOrEmpty(_filtroproductoId)) return;
+        try {
+            isConsultando = true;
+            _busquedaRealizada = false;
+            var res = await KardexService.ObtenerKardexProducto(_filtroproductoId, _fechaInicio, _fechaFin);
+            movimientos = res.OrderByDescending(m => m.fecha).ToList();
+            _busquedaRealizada = true;
+        } finally {
+            isConsultando = false;
+        }
+    }
+
+    public void Dispose() => StateService.OnChange -= StateHasChanged;
+}

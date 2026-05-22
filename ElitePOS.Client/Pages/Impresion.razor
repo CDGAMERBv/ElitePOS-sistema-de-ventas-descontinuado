@@ -1,0 +1,242 @@
+﻿@page "/impresion"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Client.Services
+@inject IConfiguracionImpresionService ImpresionService
+@inject INotificationService NotificationService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+
+<div style="min-height: 100vh; background: #f0f2f5; padding: 20px;">
+    
+    <style>
+        .custom-switch {
+            margin: 0;
+            padding-left: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .custom-switch .switch-premium {
+            width: 48px;
+            height: 26px;
+            margin: 0;
+            cursor: pointer;
+            background-color: #cbd5e1;
+            border: none;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.25s ease;
+        }
+
+        .custom-switch .switch-premium:checked {
+            background-color: #10b981;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .custom-switch .switch-premium:focus {
+            box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.2);
+        }
+        
+        .btn-guardar-premium {
+            padding: 12px 28px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .btn-guardar-premium:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(16, 185, 129, 0.4);
+        }
+        
+        .btn-guardar-premium:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+    </style>
+
+    <div style="max-width: 900px; margin: 0 auto;">
+
+        <!-- HEADER -->
+        <div style="margin-bottom: 24px; display: flex; align-items: center; gap: 16px;">
+            <button @onclick="Volver" style="padding: 10px 16px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; color: #6b7280; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;">
+                <img src="icons/back.png" alt="Volver" style="width: 18px; height: 18px;" />
+                Volver
+            </button>
+
+            <div style="flex: 1;">
+                <h1 style="font-size: 28px; font-weight: 800; color: #1a1a1a; margin: 0;">
+                    Configuración de Impresión
+                </h1>
+                <p style="font-size: 14px; color: #6b7280; font-weight: 500; margin: 4px 0 0 0;">
+                    Configura el formato de tus tickets de VentaModel
+                </p>
+            </div>
+        </div>
+
+        @if (_cargando)
+        {
+            <div style="text-align: center; padding: 60px 20px;">
+                <div style="display: inline-block; width: 40px; height: 40px; border: 3px solid #e5e7eb; border-top-color: #6366f1; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                <p style="color: #6b7280; font-weight: 600; margin-top: 16px; font-size: 14px;">Cargando configuración...</p>
+            </div>
+            <style>
+                @@keyframes spin { to { transform: rotate(360deg); } }
+            </style>
+        }
+        else
+        {
+        <!-- FORMATO DE TICKET -->
+        <div class="card-elite">
+
+            <h2 style="font-size: 18px; font-weight: 700; color: #1a1a1a; margin: 0 0 24px 0; padding-bottom: 16px; border-bottom: 2px solid #f3f4f6;">
+                Formato de Ticket
+            </h2>
+
+            <!-- Selector de Formato -->
+            <div style="margin-bottom: 0;">
+                <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px;">
+                    Tamaño del Ticket
+                </label>
+                <select @bind="configuracion.FormatoTicket"
+                        style="width: 100%; padding: 12px 16px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; background: white;">
+                    <option value="80mm">Ticket 80mm (Estándar)</option>
+                    <option value="A4">A4 (Hoja completa)</option>
+                    <option value="A5">A5 (Media carta)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- ENCABEZADO Y PIE DE PÁGINA -->
+        <div class="card-elite">
+
+            <h2 style="font-size: 18px; font-weight: 700; color: #1a1a1a; margin: 0 0 24px 0; padding-bottom: 16px; border-bottom: 2px solid #f3f4f6;">
+                Mensajes Personalizados
+            </h2>
+
+            <!-- Encabezado -->
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px;">
+                    Mensaje de Bienvenida (Encabezado)
+                    <span style="float: right; font-weight: 400; color: #9ca3af;">@((configuracion.Encabezado?.Length ?? 0))/200</span>
+                </label>
+                <textarea @bind="configuracion.Encabezado" rows="3" maxlength="200"
+                          style="width: 100%; padding: 12px 16px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; resize: vertical;"></textarea>
+            </div>
+
+            <!-- Pie de Página -->
+            <div style="margin-bottom: 0;">
+                <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 8px;">
+                    Mensaje de Despedida (Pie de Página)
+                    <span style="float: right; font-weight: 400; color: #9ca3af;">@((configuracion.PieDePagina?.Length ?? 0))/200</span>
+                </label>
+                <textarea @bind="configuracion.PieDePagina" rows="3" maxlength="200"
+                          style="width: 100%; padding: 12px 16px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; resize: vertical;"></textarea>
+            </div>
+        </div>
+
+        <!-- OPCIONES ADICIONALES -->
+        <div class="card-elite">
+
+            <h2 style="font-size: 18px; font-weight: 700; color: #1a1a1a; margin: 0 0 24px 0; padding-bottom: 16px; border-bottom: 2px solid #f3f4f6;">
+                Opciones de Impresión
+            </h2>
+
+            <!-- Imprimir Automáticamente -->
+            <div style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                <label for="chk-auto" style="font-size: 15px; font-weight: 700; color: #111827; cursor: pointer; margin: 0;">
+                    Imprimir automáticamente al cerrar VentaModel
+                </label>
+                <div class="form-check form-switch custom-switch">
+                    <input class="form-check-input switch-premium" type="checkbox" role="switch" id="chk-auto" 
+                           @bind="configuracion.ImprimirAutomaticamente" />
+                </div>
+            </div>
+
+            <!-- Mostrar Logo -->
+            <div style="margin-bottom: 0; display: flex; align-items: center; justify-content: space-between;">
+                <label for="chk-logo" style="font-size: 15px; font-weight: 700; color: #111827; cursor: pointer; margin: 0;">
+                    Mostrar logo de la empresa en el ticket
+                </label>
+                <div class="form-check form-switch custom-switch">
+                    <input class="form-check-input switch-premium" type="checkbox" role="switch" id="chk-logo" 
+                           @bind="configuracion.MostrarLogo" />
+                </div>
+            </div>
+        </div>
+
+        <!-- BOTï¿½"N GUARDAR -->
+        <div style="display: flex; justify-content: flex-end;">
+            <button @onclick="GuardarConfiguracion" class="btn-guardar-premium" disabled="@guardando">
+                <i class="bi bi-check-lg"></i>
+                @(guardando ? "Guardando..." : "Guardar Cambios")
+            </button>
+        </div>
+        }
+    </div>
+</div>
+
+@code {
+    private ConfiguracionImpresionModel configuracion = new();
+    private bool guardando = false;
+    private bool _cargando = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        configuracion = await ImpresionService.ObtenerConfiguracion();
+        _cargando = false;
+    }
+
+    private async Task GuardarConfiguracion()
+    {
+        if (guardando) return;
+
+        try
+        {
+            guardando = true;
+            StateHasChanged();
+            
+            var success = await ImpresionService.GuardarConfiguracion(configuracion);
+            if (success)
+            {
+                await NotificationService.ShowSuccess("Configuración de impresión guardada correctamente.");
+            }
+            else
+            {
+                await NotificationService.ShowError("No se pudo guardar la configuración.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al guardar configuración de impresión: {ex.Message}");
+            await NotificationService.ShowError("Error inesperado al guardar.");
+        }
+
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private void Volver()
+    {
+        Navigation.NavigateTo("/configuracion");
+    }
+}
+
+
+
+
+
+

@@ -1,0 +1,279 @@
+@page "/comprobante-impresion"
+@inject IJSRuntime JSRuntime
+@using ElitePOS.Shared.Models
+
+<div id="comprobante-impresion" style="width: 210mm; background: white; font-family: Arial, sans-serif; font-size: 11px; padding: 15px; box-sizing: border-box;">
+    
+    <!-- â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â -->
+    <!-- ENCABEZADO SUPERIOR                                                   -->
+    <!-- â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 15px;">
+        
+        <!-- Logo a la izquierda -->
+        <div style="width: 25%;">
+            @if (!string.IsNullOrEmpty(Empresa?.LogoUrl))
+            {
+                <img src="@Empresa.LogoUrl" alt="Logo Empresa" style="max-width: 120px; max-height: 60px;" />
+            }
+            else
+            {
+                <div style="width: 120px; height: 60px; background: #f0f0f0; border: 1px solid #ddd; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 10px; color: #666;">LOGO</span>
+                </div>
+            }
+        </div>
+        
+        <!-- Datos de la empresa al centro -->
+        <div style="width: 45%; text-align: center;">
+            <div style="font-size: 16px; font-weight: bold; margin-bottom: 4px;">
+                @(Empresa?.razonSocial ?? "ELITE POS SOLUTIONS")
+            </div>
+            <div style="font-size: 10px; margin-bottom: 2px;">
+                RUC: @(Empresa?.ruc ?? "20123456789")
+            </div>
+            @if (!string.IsNullOrEmpty(Empresa?.direccion))
+            {
+                <div style="font-size: 9px; margin-bottom: 2px;">@(Empresa?.direccion)</div>
+                <div style="font-size: 9px; margin-bottom: 2px;">
+                    @(Empresa?.distrito) - @(Empresa?.provincia) - @(Empresa?.departamento)
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(Empresa?.telefono))
+            {
+                <div style="font-size: 9px; margin-bottom: 2px;">Tel: @(Empresa?.telefono)</div>
+            }
+            @if (!string.IsNullOrEmpty(Empresa?.correo))
+            {
+                <div style="font-size: 9px;">Email: @(Empresa?.correo)</div>
+            }
+        </div>
+        
+        <!-- Recuadro a la derecha -->
+        <div style="width: 25%; border: 2px solid #333; padding: 8px; text-align: center;">
+            <div style="font-size: 10px; font-weight: bold; margin-bottom: 4px;">RUC:</div>
+            <div style="font-size: 12px; font-weight: bold; margin-bottom: 8px;">@(Empresa?.ruc ?? "20123456789")</div>
+            
+            <div style="font-size: 10px; font-weight: bold; margin-bottom: 4px;">@((Venta?.tipoComprobante ?? "FACTURA").ToUpper())</div>
+            <div style="font-size: 10px; font-weight: bold; margin-bottom: 4px;">ELECTRÍ“NICA</div>
+            
+            <div style="font-size: 10px; margin-bottom: 2px;">Serie:</div>
+            <div style="font-size: 12px; font-weight: bold; margin-bottom: 8px;">@(Venta?.numeroComprobante?.Split('-')[0] ?? "F001")</div>
+            
+            <div style="font-size: 10px; margin-bottom: 2px;">Número:</div>
+            <div style="font-size: 12px; font-weight: bold;">@(Venta?.numeroComprobante?.Split('-')[1] ?? "000001")</div>
+        </div>
+    </div>
+    
+    <!-- â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â -->
+    <!-- DATOS DEL CLIENTE                                                    -->
+    <!-- â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â -->
+    <div style="margin-bottom: 20px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd;">
+        <div style="display: flex; justify-content: space-between;">
+            <div style="width: 50%;">
+                <div style="font-size: 10px; font-weight: bold; margin-bottom: 4px;">DATOS DEL CLIENTE:</div>
+                <div style="font-size: 10px; margin-bottom: 2px;">
+                    <strong>RUC/DNI:</strong> @(Venta?.numeroDocumentoCliente ?? "00000000")
+                </div>
+                <div style="font-size: 10px; margin-bottom: 2px;">
+                    <strong>Nombre/Razón Social:</strong> @(Venta?.cliente ?? "CLIENTE GENERAL")
+                </div>
+                <div style="font-size: 10px;">
+                    <strong>Dirección:</strong> _________________________________
+                </div>
+            </div>
+            <div style="width: 50%;">
+                <div style="font-size: 10px; margin-bottom: 2px;">
+                    <strong>Fecha de Emisión:</strong> @(Venta?.fechaHora.ToString("dd/MM/yyyy") ?? DateTime.Now.ToString("dd/MM/yyyy"))
+                </div>
+                <div style="font-size: 10px;">
+                    <strong>Fecha de Vencimiento:</strong> 
+                    @(Venta?.fechaVencimiento?.ToString("dd/MM/yyyy") ?? (Venta?.CondicionPago == "Crédito" ? DateTime.Now.AddDays(30).ToString("dd/MM/yyyy") : "-"))
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â -->
+    <!-- TABLA DE PRODUCTOS                                                   -->
+    <!-- â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â -->
+    <div style="margin-bottom: 20px;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+            <thead>
+                <tr style="border-top: 1px solid #333; border-bottom: 1px solid #333;">
+                    <th style="text-align: center; padding: 4px; font-weight: bold;">NÍ‚Â°</th>
+                    <th style="text-align: center; padding: 4px; font-weight: bold;">UNIDAD</th>
+                    <th style="text-align: center; padding: 4px; font-weight: bold;">CÍ“DIGO</th>
+                    <th style="text-align: left; padding: 4px; font-weight: bold;">DESCRIPCIÍ“N</th>
+                    <th style="text-align: center; padding: 4px; font-weight: bold;">CANTIDAD</th>
+                    <th style="text-align: right; padding: 4px; font-weight: bold;">P. UNIT</th>
+                    <th style="text-align: right; padding: 4px; font-weight: bold;">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Venta?.items != null)
+                {
+                    int contador = 1;
+                    @foreach (var item in Venta.items)
+                    {
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="text-align: center; padding: 3px;">@contador</td>
+                            <td style="text-align: center; padding: 3px;">UND</td>
+                            <td style="text-align: center; padding: 3px;">@(item.productoId?.Substring(0, Math.Min(8, item.productoId.Length)) ?? "COD")</td>
+                            <td style="text-align: left; padding: 3px;">@item.nombreProducto</td>
+                            <td style="text-align: center; padding: 3px;">@item.cantidad</td>
+                            <td style="text-align: right; padding: 3px;">@item.precioUnitario.ToString("N2")</td>
+                            <td style="text-align: right; padding: 3px;">@item.subtotal.ToString("N2")</td>
+                        </tr>
+                        contador++;
+                    }
+                }
+                else
+                {
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td colspan="7" style="text-align: center; padding: 20px; color: #666;">
+                            No hay productos en esta venta
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â -->
+    <!-- PIE DE PÁGINA LEGAL Y TOTALES                                     -->
+    <!-- â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â -->
+    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+        
+        <!-- Monto en letras -->
+        <div style="width: 60%;">
+            <div style="font-size: 10px; font-weight: bold; margin-bottom: 4px;">SON:</div>
+            <div style="font-size: 10px; padding: 5px; background: #f9f9f9; border: 1px solid #ddd; min-height: 30px;">
+                @ConvertirNumeroALetras(Venta?.total ?? 0)
+            </div>
+        </div>
+        
+        <!-- Resumen de totales -->
+        <div style="width: 35%;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 10px;">
+                <tr>
+                    <td style="text-align: left; padding: 3px;">OP. GRAVADA:</td>
+                    <td style="text-align: right; padding: 3px;">@(Venta?.subtotalGravada.ToString("N2") ?? "0.00")</td>
+                </tr>
+                <tr>
+                    <td style="text-align: left; padding: 3px;">OP. INAFECTA:</td>
+                    <td style="text-align: right; padding: 3px;">0.00</td>
+                </tr>
+                <tr>
+                    <td style="text-align: left; padding: 3px;">OP. EXONERADA:</td>
+                    <td style="text-align: right; padding: 3px;">0.00</td>
+                </tr>
+                <tr>
+                    <td style="text-align: left; padding: 3px;">IGV (18%):</td>
+                    <td style="text-align: right; padding: 3px;">@(Venta?.igv.ToString("N2") ?? "0.00")</td>
+                </tr>
+                <tr style="border-top: 2px solid #333; font-weight: bold;">
+                    <td style="text-align: left; padding: 3px;">TOTAL:</td>
+                    <td style="text-align: right; padding: 3px;">@(Venta?.total.ToString("N2") ?? "0.00")</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    
+    <!-- â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â -->
+    <!-- QR Y HASH                                                           -->
+    <!-- â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â -->
+    <div style="border-top: 1px solid #333; padding-top: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <div style="width: 60%;">
+                <div style="font-size: 9px; color: #666; margin-bottom: 10px;">
+                    <strong>Representación impresa de la @(Venta?.tipoComprobante ?? "FACTURA") Electrónica</strong>
+                </div>
+                <div style="font-size: 9px; color: #666;">
+                    <div>Esta @(Venta?.tipoComprobante ?? "FACTURA") ha sido emitida a través del sistema ElitePOS</div>
+                    <div>Para verificar su autenticidad, escanee el código QR o visite el portal SUNAT</div>
+                </div>
+            </div>
+            <div style="width: 35%; text-align: right;">
+                <div style="width: 80px; height: 80px; background: #f0f0f0; border: 1px solid #ccc; margin-left: auto;">
+                    <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">
+                        <span style="font-size: 8px; color: #666;">CÍ“DIGO QR</span>
+                    </div>
+                </div>
+                <div style="font-size: 8px; color: #666; margin-top: 5px; text-align: center;">
+                    Hash: _______________________________
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â -->
+    <!-- PIE FINAL                                                           -->
+    <!-- â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â -->
+    <div style="margin-top: 20px; text-align: center; font-size: 9px; color: #666; border-top: 1px solid #eee; padding-top: 10px;">
+        Generado por ElitePOS - Sistema de Punto de Venta Profesional
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public VentaModel? Venta { get; set; }
+
+    [Parameter]
+    public ConfiguracionEmpresaModel? Empresa { get; set; }
+
+    private string ConvertirNumeroALetras(decimal numero)
+    {
+        // Implementación básica para convertir números a letras
+        // En producción, usar una librería especializada
+        if (numero == 0) return "CERO";
+        
+        string[] unidades = { "", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE" };
+        string[] decenas = { "", "DIEZ", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA" };
+        string[] centenas = { "", "CIEN", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS" };
+        
+        int parteEntera = (int)numero;
+        int parteDecimal = (int)((numero - parteEntera) * 100);
+        
+        string letras = "";
+        
+        if (parteEntera >= 1000)
+        {
+            int miles = parteEntera / 1000;
+            letras += $"{miles} MIL ";
+            parteEntera %= 1000;
+        }
+        
+        if (parteEntera >= 100)
+        {
+            letras += centenas[parteEntera / 100] + " ";
+            parteEntera %= 100;
+        }
+        
+        if (parteEntera >= 20)
+        {
+            letras += decenas[parteEntera / 10] + " ";
+            parteEntera %= 10;
+        }
+        
+        if (parteEntera > 0)
+        {
+            letras += unidades[parteEntera] + " ";
+        }
+        
+        return $"{letras.Trim()} Y {parteDecimal:D2}/100 SOLES";
+    }
+
+    // Método para imprimir el comprobante
+    private async Task ImprimirComprobante()
+    {
+        await JSRuntime.InvokeVoidAsync("window.print");
+    }
+}
+
+
+
+
+
+
+
+

@@ -1,0 +1,268 @@
+@page "/inventario"
+@using ElitePOS.Shared.Models
+
+<div class="dashboard-premium px-4 py-6" style="padding: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px;">
+        <div>
+            <h3 style="font-weight: 800; font-size: 24px; margin: 0; color: #111827;">Gestión de Inventario</h3>
+        </div>
+        <div>
+            <button class="btn btn-primary" style="background-color: #4F46E5; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;" @onclick="AbrirModalAgregarProducto">
+                <i class="bi bi-plus-lg" style="margin-right: 8px;"></i> Nuevo Producto
+            </button>
+        </div>
+    </div>
+
+    <!-- Indicadores -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 24px;">
+        <div class="glass-card" style="padding: 20px;">
+            <span style="color: #6B7280; font-size: 12px; font-weight: 600; text-transform: uppercase;">Total Productos</span>
+            <h4 style="font-weight: 800; margin: 8px 0; font-size: 24px; color: #111827;">@totalProducts</h4>
+        </div>
+        <div class="glass-card" style="padding: 20px;">
+            <span style="color: #6B7280; font-size: 12px; font-weight: 600; text-transform: uppercase;">Valor del Inventario</span>
+            <h4 style="font-weight: 800; margin: 8px 0; font-size: 24px; color: #111827;">S/ @totalInventoryValue.ToString("N0")</h4>
+        </div>
+        <div class="glass-card" style="padding: 20px;">
+            <span style="color: #6B7280; font-size: 12px; font-weight: 600; text-transform: uppercase;">Alertas de Stock Bajo</span>
+            <h4 style="font-weight: 800; margin: 8px 0; font-size: 24px; color: #EF4444;">@lowStockAlerts</h4>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="glass-card" style="padding: 20px; margin-bottom: 24px; display: flex; gap: 16px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 250px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Buscar</label>
+            <input type="text" placeholder="Buscar por nombre o SKU..." value="@textoBusqueda" @oninput="OnBusquedaInput" style="width: 100%; padding: 10px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none; transition: border-color 0.2s;" />
+        </div>
+        <div style="min-width: 200px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Categoría</label>
+            <select @bind="categoriaSeleccionada" style="width: 100%; padding: 10px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none; background: white;">
+                <option value="Todas">Todas</option>
+                @foreach (var cat in categorias)
+                {
+                    <option value="@cat">@cat</option>
+                }
+            </select>
+        </div>
+        <div style="min-width: 200px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Estado</label>
+            <select @bind="estadoSeleccionado" style="width: 100%; padding: 10px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none; background: white;">
+                <option value="Todos">Todos</option>
+                <option value="En Stock">En Stock</option>
+                <option value="Stock Bajo">Stock Bajo</option>
+                <option value="Agotado">Agotado</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Tabla -->
+    <div class="glass-card" style="padding: 24px; overflow-x: auto;">
+        <h5 style="font-weight: 700; margin: 0 0 16px 0; font-size: 16px; color: #111827;">Productos</h5>
+        
+        @if (cargando)
+        {
+            <div style="text-align: center; padding: 40px 0;">
+                <p style="color: #6B7280;">Cargando productos...</p>
+            </div>
+        }
+        else if (!productosFiltrados.Any())
+        {
+            <div style="text-align: center; padding: 40px 0;">
+                <p style="color: #6B7280;">No se encontraron productos.</p>
+            </div>
+        }
+        else
+        {
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">PRODUCTO</th>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">SKU</th>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">CATEGORÍA</th>
+                        <th style="text-align: right; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">PRECIO</th>
+                        <th style="text-align: center; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">STOCK</th>
+                        <th style="text-align: right; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var prod in productosFiltrados)
+                    {
+                        <tr>
+                            <td style="padding: 16px 0; border-bottom: 1px solid #F1F5F9; font-weight: 500; color: #111827; font-size: 14px;">@prod.nombre</td>
+                            <td style="padding: 16px 0; border-bottom: 1px solid #F1F5F9; color: #6B7280; font-size: 14px;">@prod.codigoBarras</td>
+                            <td style="padding: 16px 0; border-bottom: 1px solid #F1F5F9; font-size: 14px;"><span style="background: #F1F5F9; padding: 4px 8px; border-radius: 4px;">@prod.categoria</span></td>
+                            <td style="text-align: right; padding: 16px 0; border-bottom: 1px solid #F1F5F9; font-weight: 600; font-size: 14px;">S/ @prod.precioVenta.ToString("N2")</td>
+                            <td style="text-align: center; padding: 16px 0; border-bottom: 1px solid #F1F5F9; font-weight: 700; font-size: 14px; color: @(prod.stock <= prod.stockMinimo ? "#EF4444" : "#10B981")">@prod.stock</td>
+                            <td style="text-align: right; padding: 16px 0; border-bottom: 1px solid #F1F5F9;">
+                                <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                                    <button @onclick="() => AbrirModalKardex(prod)" style="background: rgba(59, 130, 246, 0.1); color: #3B82F6; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;">Kardex</button>
+                                    <button @onclick="() => AbrirModalEditar(prod)" style="background: rgba(16, 185, 129, 0.1); color: #10B981; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;">Editar</button>
+                                    <button @onclick="() => AbrirModalEliminar(prod)" style="background: rgba(239, 68, 68, 0.1); color: #EF4444; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;">Eliminar</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<!-- Estilos base para modales nativos -->
+<style>
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(15, 23, 42, 0.6);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+    .modal-content {
+        background: #FFFFFF;
+        border-radius: 16px;
+        padding: 24px;
+        width: 100%;
+        max-width: 500px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .modal-content.large {
+        max-width: 800px;
+    }
+    .form-group {
+        margin-bottom: 16px;
+    }
+    .form-control {
+        width: 100%; padding: 10px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none;
+    }
+    .form-label {
+        display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;
+    }
+</style>
+
+<!-- Modal Agregar -->
+@if (mostrarModalAgregar)
+{
+    <div class="modal-overlay" @onclick="CerrarModalAgregar">
+        <div class="modal-content" @onclick:stopPropagation>
+            <h5 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700;">Nuevo Producto</h5>
+            
+            <div class="form-group"><label class="form-label">Nombre</label><input class="form-control" type="text" @bind="nuevoProducto.nombre" /></div>
+            <div class="form-group"><label class="form-label">SKU</label><input class="form-control" type="text" @bind="nuevoProducto.codigoBarras" /></div>
+            <div class="form-group"><label class="form-label">Categoría</label><input class="form-control" type="text" @bind="nuevoProducto.categoria" /></div>
+            <div class="form-group">
+                <label class="form-label">Unidad</label>
+                <select class="form-control" @bind="nuevoProducto.unidadMedida">
+                    <option value="Unidad">Unidad</option>
+                    <option value="Caja">Caja</option>
+                    <option value="Kilo">Kilo</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 16px;">
+                <div class="form-group" style="flex: 1;"><label class="form-label">Precio</label><input class="form-control" type="number" step="0.01" @bind="nuevoProducto.precioVenta" /></div>
+                <div class="form-group" style="flex: 1;"><label class="form-label">Stock Inicial</label><input class="form-control" type="number" @bind="nuevoProducto.stock" /></div>
+            </div>
+            <div class="form-group"><label class="form-label">URL de Imagen</label><input class="form-control" type="text" @bind="nuevoProducto.imagenUrl" /></div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                <button @onclick="CerrarModalAgregar" style="background: white; border: 1px solid #E2E8F0; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: #475569; cursor: pointer;">Cancelar</button>
+                <button @onclick="GuardarNuevoProducto" style="background: #4F46E5; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer;">Guardar</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Editar -->
+@if (mostrarModalEditar)
+{
+    <div class="modal-overlay" @onclick="CerrarModalEditar">
+        <div class="modal-content" @onclick:stopPropagation>
+            <h5 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700;">Editar Producto</h5>
+            
+            <div class="form-group"><label class="form-label">Nombre</label><input class="form-control" type="text" @bind="productoEditando.nombre" /></div>
+            <div class="form-group"><label class="form-label">Categoría</label><input class="form-control" type="text" @bind="productoEditando.categoria" /></div>
+            <div style="display: flex; gap: 16px;">
+                <div class="form-group" style="flex: 1;"><label class="form-label">Precio</label><input class="form-control" type="number" step="0.01" @bind="productoEditando.precioVenta" /></div>
+                <div class="form-group" style="flex: 1;"><label class="form-label">Stock</label><input class="form-control" type="number" @bind="productoEditando.stock" /></div>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                <button @onclick="CerrarModalEditar" style="background: white; border: 1px solid #E2E8F0; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: #475569; cursor: pointer;">Cancelar</button>
+                <button @onclick="GuardarEdicion" style="background: #10B981; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer;">Actualizar</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Eliminar -->
+@if (mostrarModalEliminar)
+{
+    <div class="modal-overlay" @onclick="CerrarModalEliminar">
+        <div class="modal-content" @onclick:stopPropagation style="text-align: center; max-width: 400px;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); color: #EF4444; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 32px;">
+                <i class="bi bi-exclamation-triangle"></i>
+            </div>
+            <h5 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 700; color: #111827;">¿Eliminar producto?</h5>
+            <p style="margin: 0 0 24px 0; color: #6B7280;">Esta acción no se puede deshacer. Vas a eliminar: <strong style="color: #111827;">@productoEliminando.nombre</strong></p>
+            
+            <div style="display: flex; justify-content: center; gap: 12px;">
+                <button @onclick="CerrarModalEliminar" style="background: white; border: 1px solid #E2E8F0; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: #475569; cursor: pointer;">Cancelar</button>
+                <button @onclick="EliminarProducto" style="background: #EF4444; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer;">Eliminar</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Kardex -->
+@if (mostrarModalKardex)
+{
+    <div class="modal-overlay" @onclick="CerrarModalKardex">
+        <div class="modal-content large" @onclick:stopPropagation>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h5 style="margin: 0; font-size: 18px; font-weight: 700;">Historial Kardex - @productoKardex.nombre</h5>
+                <button @onclick="CerrarModalKardex" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #94A3B8;">&times;</button>
+            </div>
+            
+            @if (cargandoKardex)
+            {
+                <div style="text-align: center; padding: 40px 0;">
+                    <p style="color: #6B7280;">Cargando historial...</p>
+                </div>
+            }
+            else
+            {
+                <div style="overflow-x: auto; max-height: 400px;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead style="position: sticky; top: 0; background: white;">
+                            <tr>
+                                <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding: 12px 8px; border-bottom: 1px solid #E2E8F0;">FECHA</th>
+                                <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding: 12px 8px; border-bottom: 1px solid #E2E8F0;">TIPO</th>
+                                <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding: 12px 8px; border-bottom: 1px solid #E2E8F0;">CONCEPTO</th>
+                                <th style="text-align: center; font-weight: 600; color: #6B7280; font-size: 12px; padding: 12px 8px; border-bottom: 1px solid #E2E8F0;">CANT.</th>
+                                <th style="text-align: right; font-weight: 600; color: #6B7280; font-size: 12px; padding: 12px 8px; border-bottom: 1px solid #E2E8F0;">COSTO</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var k in GestionState.productoKardexCache)
+                            {
+                                <tr>
+                                    <td style="padding: 12px 8px; border-bottom: 1px solid #F1F5F9; font-size: 13px;">@k.fecha.ToString("dd/MM/yy HH:mm")</td>
+                                    <td style="padding: 12px 8px; border-bottom: 1px solid #F1F5F9; font-size: 13px;">
+                                        <span style="background: @(k.tipoMovimiento == "ENTRADA" ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)"); color: @(k.tipoMovimiento == "ENTRADA" ? "#10B981" : "#EF4444"); padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 11px;">
+                                            @k.tipoMovimiento
+                                        </span>
+                                    </td>
+                                    <td style="padding: 12px 8px; border-bottom: 1px solid #F1F5F9; font-size: 13px;">@k.concepto</td>
+                                    <td style="text-align: center; padding: 12px 8px; border-bottom: 1px solid #F1F5F9; font-size: 13px; font-weight: 600;">@k.cantidad</td>
+                                    <td style="text-align: right; padding: 12px 8px; border-bottom: 1px solid #F1F5F9; font-size: 13px;">S/ @k.costoPromedioNuevo.ToString("N2")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}

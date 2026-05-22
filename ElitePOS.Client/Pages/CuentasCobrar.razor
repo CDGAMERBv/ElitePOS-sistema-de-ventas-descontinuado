@@ -1,0 +1,273 @@
+@page "/cuentas-por-cobrar"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [Authorize]
+@using ElitePOS.Shared.Models
+@using ElitePOS.Services
+@using ElitePOS.Client.Services
+@using ElitePOS.Client.Components
+@inject IVentasService VentasService
+@inject IClientesService ClientesService
+@inject IAbonosService AbonosService
+@inject ISesionService SesionService
+@inject IConfiguracionEmpresaService ConfiguracionService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@inject GestionStateService GestionState
+@implements IDisposable
+@inject AuthenticationStateProvider authenticationStateProvider
+
+<div style="min-height: 100vh; background: #f8fafc; padding: 24px;">
+    <div style="max-width: 1200px; margin: 0 auto;">
+        
+        <div style="margin-bottom: 32px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1 style="font-size: 28px; font-weight: 800; color: #1e293b; margin: 0;">Cuentas por Cobrar</h1>
+                <p style="color: #64748b; margin: 4px 0 0 0;">Control de ventas al crédito y cobranzas</p>
+            </div>
+            
+            <div style="display: flex; gap: 16px;">
+                <div style="background: white; border-radius: 12px; padding: 12px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); text-align: right;">
+                    <p style="font-size: 11px; font-weight: 700; color: #64748b; margin: 0; text-transform: uppercase;">TOTAL PENDIENTE</p>
+                    <p style="font-size: 20px; font-weight: 800; margin: 0; color: #ef4444;">S/ @totalPorCobrar.ToString("N2")</p>
+                </div>
+            </div>
+        </div>
+
+        <div style="background: white; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 24px;">
+            <div style="display: flex; gap: 16px; align-items: center;">
+                <div style="flex: 1; position: relative;">
+                    <i class="bi bi-search" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                    <input type="text" placeholder="Buscar por cliente o comprobante..." @bind="textoBusqueda" @bind:event="oninput" @onkeyup="Filtrar" 
+                           style="width: 100%; padding: 12px 16px 12px 46px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 14px; outline: none; transition: border-color 0.2s;" />
+                </div>
+                <div style="display: flex; gap: 4px; background: #f1f5f9; padding: 4px; border-radius: 12px;">
+                    <button class="btn btn-sm @(estadoFiltro == "" ? "btn-white shadow-sm" : "text-secondary")" @onclick='() => CambiarFiltroEstado("")'>Todas</button>
+                    <button class="btn btn-sm @(estadoFiltro == "pendiente" ? "btn-white shadow-sm" : "text-secondary")" @onclick='() => CambiarFiltroEstado("pendiente")'>Pendientes</button>
+                    <button class="btn btn-sm @(estadoFiltro == "pagado" ? "btn-white shadow-sm" : "text-secondary")" @onclick='() => CambiarFiltroEstado("pagado")'>Pagadas</button>
+                </div>
+            </div>
+        </div>
+
+        @if (cargando)
+        {
+            <div style="text-align: center; padding: 100px;">
+                <div class="spinner-border text-primary"></div>
+                <p style="margin-top: 16px; color: #64748b; font-weight: 600;">Cargando registros...</p>
+            </div>
+        }
+        else
+        {
+            <div style="background: white; border-radius: 16px; padding: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; overflow: hidden;">
+                <div style="overflow-x: auto;">
+                    <table class="table table-hover mb-0" style="font-size: 13px;">
+                        <thead class="bg-light">
+                            <tr>
+                                <th style="padding: 16px 20px;">Fecha</th>
+                                <th style="padding: 16px 20px;">Comprobante</th>
+                                <th style="padding: 16px 20px;">Cliente</th>
+                                <th style="padding: 16px 20px; text-align: right;">Total</th>
+                                <th style="padding: 16px 20px; text-align: right;">Pendiente</th>
+                                <th style="padding: 16px 20px; text-align: center;">Vencimiento</th>
+                                <th style="padding: 16px 20px; text-align: center;">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var v in ventasFiltradas)
+                            {
+                                var esVencida = v.montoPendiente > 0 && v.fechaVencimiento.HasValue && v.fechaVencimiento < DateTime.Today;
+                                <tr style="background: @(esVencida ? "#fff1f2" : "transparent");">
+                                    <td style="padding: 16px 20px;">@v.fechaHora.ToString("dd/MM/yyyy")</td>
+                                    <td style="padding: 16px 20px;">
+                                        <div style="font-weight: 700; color: #1e293b;">@v.numeroComprobante</div>
+                                        <span style="font-size: 10px; color: #64748b;">@v.tipoComprobante</span>
+                                    </td>
+                                    <td style="padding: 16px 20px;">@v.cliente</td>
+                                    <td style="padding: 16px 20px; text-align: right; font-weight: 600;">S/ @v.total.ToString("N2")</td>
+                                    <td style="padding: 16px 20px; text-align: right;">
+                                        <span style="font-weight: 800; color: @(v.montoPendiente > 0 ? "#ef4444" : "#10b981");">
+                                            S/ @v.montoPendiente.ToString("N2")
+                                        </span>
+                                    </td>
+                                    <td style="padding: 16px 20px; text-align: center;">
+                                        @if (v.fechaVencimiento.HasValue) 
+                                        { 
+                                            <span class="badge @(esVencida ? "bg-danger" : "bg-light text-dark")">
+                                                @v.fechaVencimiento.Value.ToString("dd/MM/yyyy")
+                                            </span> 
+                                        }
+                                        else { <span class="text-muted">-</span> }
+                                    </td>
+                                    <td style="padding: 16px 20px; text-align: center;">
+                                        <div style="display: flex; gap: 8px; justify-content: center;">
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => AbrirModalDetalle(v)" title="Ver detalle">
+                                                <i class="bi bi-eye"></i>
+                                            </button>
+                                            @if (v.montoPendiente > 0) 
+                                            { 
+                                                <button class="btn btn-sm btn-success" @onclick="() => AbrirModalAbono(v)" title="Registrar abono">
+                                                    <i class="bi bi-plus-lg"></i>
+                                                </button> 
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            @if (!ventasFiltradas.Any())
+            {
+                <div style="text-align: center; padding: 60px; color: #94a3b8;">
+                    <i class="bi bi-inbox" style="font-size: 48px;"></i>
+                    <p style="margin-top: 16px; font-weight: 600;">No se encontraron cuentas por cobrar</p>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@if (mostrarModalAbono && ventaSeleccionada != null)
+{
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px;">
+        <div style="background: white; border-radius: 20px; padding: 32px; width: 100%; max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h3 style="font-size: 20px; font-weight: 800; margin: 0;">Registrar Abono</h3>
+                <button class="btn-close" @onclick="CerrarModalAbono"></button>
+            </div>
+
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="font-size: 13px; color: #64748b;">Comprobante:</span>
+                    <span style="font-weight: 700; color: #1e293b;">@ventaSeleccionada.numeroComprobante</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="font-size: 13px; color: #64748b;">Pendiente:</span>
+                    <span style="font-weight: 800; color: #ef4444; font-size: 18px;">S/ @ventaSeleccionada.montoPendiente.ToString("N2")</span>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label style="font-size: 12px; font-weight: 700; color: #64748b; display: block; margin-bottom: 8px;">MONTO DEL ABONO (S/)</label>
+                <input type="number" class="form-control form-control-lg" @bind="montoAbono" max="@ventaSeleccionada.montoPendiente" step="0.01" />
+            </div>
+
+            <div class="mb-4">
+                <label style="font-size: 12px; font-weight: 700; color: #64748b; display: block; margin-bottom: 8px;">MÍ‰TODO DE PAGO</label>
+                <select class="form-select" @bind="metodoPagoAbono">
+                    <option value="Efectivo">Efectivo</option>
+                    <option value="Transferencia">Transferencia</option>
+                    <option value="Yape/Plin">Yape/Plin</option>
+                </select>
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+                <button class="btn btn-light flex-fill py-2" @onclick="CerrarModalAbono" style="font-weight: 700;">CANCELAR</button>
+                <button class="btn btn-success flex-fill py-2" @onclick="ConfirmarAbono" disabled="@(montoAbono <= 0 || procesandoAbono)" style="font-weight: 700;">
+                    @if (procesandoAbono) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                    CONFIRMAR
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<VentaModel> ventasCredito = new();
+    private List<VentaModel> ventasFiltradas = new();
+    private string textoBusqueda = "";
+    private string estadoFiltro = "pendiente";
+    private bool cargando = true;
+    private decimal totalPorCobrar = 0;
+    private bool mostrarModalAbono = false;
+    private bool procesandoAbono = false;
+    private VentaModel? ventaSeleccionada;
+    private decimal montoAbono = 0;
+    private string metodoPagoAbono = "Efectivo";
+
+    protected override async Task OnInitializedAsync()
+    {
+        GestionState.OnChange += StateHasChanged;
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        try { 
+            cargando = true;
+            var todas = await GestionState.GetVentasAsync();
+            // Filtrar ventas al crédito (no anuladas)
+            ventasCredito = todas.Where(v => v.tipoPago != "Contado" && !v.anulada).ToList();
+            Filtrar();
+        } finally { cargando = false; }
+    }
+
+    private void Filtrar()
+    {
+        var temp = ventasCredito.AsEnumerable();
+        
+        if (!string.IsNullOrWhiteSpace(textoBusqueda))
+        {
+            temp = temp.Where(v => 
+                v.cliente.Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase) || 
+                v.numeroComprobante.Contains(textoBusqueda, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (estadoFiltro == "pendiente") temp = temp.Where(v => v.montoPendiente > 0);
+        else if (estadoFiltro == "pagado") temp = temp.Where(v => v.montoPendiente <= 0);
+        
+        ventasFiltradas = temp.OrderByDescending(v => v.fechaHora).ToList();
+        totalPorCobrar = ventasFiltradas.Sum(v => v.montoPendiente);
+    }
+
+    private void CambiarFiltroEstado(string s) { estadoFiltro = s; Filtrar(); }
+    
+    private void AbrirModalAbono(VentaModel v) 
+    { 
+        ventaSeleccionada = v; 
+        montoAbono = v.montoPendiente; 
+        metodoPagoAbono = "Efectivo";
+        mostrarModalAbono = true; 
+    }
+    
+    private void CerrarModalAbono() { mostrarModalAbono = false; ventaSeleccionada = null; }
+    
+    private void AbrirModalDetalle(VentaModel v) => Navigation.NavigateTo($"/ventas/detalle/{v.id}");
+
+    private async Task ConfirmarAbono()
+    {
+        if (ventaSeleccionada == null || montoAbono <= 0) return;
+        try 
+        {
+            procesandoAbono = true;
+            var abono = new AbonoModel 
+            { 
+                ventaId = ventaSeleccionada.id, 
+                montoAbono = montoAbono, 
+                fechaAbono = DateTime.Now, 
+                metodoPago = metodoPagoAbono,
+                clienteId = ventaSeleccionada.clienteId,
+                nombreCliente = ventaSeleccionada.cliente,
+                numeroComprobante = ventaSeleccionada.numeroComprobante,
+                usuarioId = SesionService.UsuarioActual?.usuarioId ?? "",
+                nombreUsuario = SesionService.UsuarioActual?.nombre ?? "Admin"
+            };
+
+            var ok = await AbonosService.RegistrarAbono(abono);
+            if (ok) 
+            { 
+                await Cargar(); 
+                CerrarModalAbono(); 
+            }
+        } 
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al registrar abono: {ex.Message}");
+        }
+        finally { procesandoAbono = false; }
+    }
+
+    public void Dispose() => GestionState.OnChange -= StateHasChanged;
+}

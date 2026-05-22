@@ -1,0 +1,75 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Routing
+
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <Authorizing>
+                    <!-- ESTADO DE CARGA: Unificado con index.html (Dark Blue) -->
+                    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background: #0f172a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+                        <div style="text-align: center; animation: fadeIn 0.5s ease-in;">
+                            <!-- Logo Wrapper -->
+                            <div style="font-size: 4rem; color: #3b82f6; margin-bottom: 15px; animation: pulse 2s infinite;">
+                                <i class="bi bi-cart4"></i>
+                            </div>
+                            
+                            <div style="margin-bottom: 30px;">
+                                <span style="color: white; font-size: 2.5rem; font-weight: 800; letter-spacing: 1px;">Elite<span style="color: #3b82f6;">POS</span></span>
+                                <p style="color: #94a3b8; font-size: 1rem; margin-top: 5px;">Verificando sesión...</p>
+                            </div>
+
+                            <div style="width: 200px; height: 4px; background: #1e293b; border-radius: 10px; margin: 0 auto; overflow: hidden;">
+                                <div style="width: 100%; height: 100%; background: #3b82f6; animation: loadingAnim 2s infinite ease-in-out;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </Authorizing>
+                <NotAuthorized>
+                    @if (context.User?.Identity?.IsAuthenticated == true)
+                    {
+                        // Usuario autenticado pero no autorizado para esta ruta
+                        <RedirectToLogin />
+                    }
+                    else
+                    {
+                        // Usuario no autenticado - forzar redirección a login
+                        <RedirectToLogin />
+                    }
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>Not found</PageTitle>
+            <LayoutView Layout="@typeof(MainLayout)">
+                <p role="alert">Sorry, there's nothing at this address.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
+
+<style>
+    @@keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    
+    @@keyframes pulse {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.1); opacity: 0.7; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+
+    @@keyframes loadingAnim {
+        0% { transform: translateX(-100%); }
+        50% { transform: translateX(0); }
+        100% { transform: translateX(100%); }
+    }
+</style>
+
+
+
+
+
+

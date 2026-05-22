@@ -1,0 +1,1054 @@
+@page "/ventas"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Services
+@inject IInventarioService InventarioService
+@inject IVentasService VentasService
+@inject IClientesService ClientesService
+@inject ISesionService SesionService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject INotificationService NotificationService
+
+<div class="pos-page-container" id="punto-cotizacion-hub">
+    <!-- Top Header Title -->
+    <div class="pos-top-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.15rem;">
+        <h1 class="pos-main-title" style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary); margin: 0; font-family: var(--font-title);">
+            Nueva venta
+        </h1>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" @onclick='() => NotificationService.ShowInfo("Tipo de cambio actual: S/ 3.75")' class="btn-pos-secondary" style="height: 32px; padding: 0 0.75rem; font-size: 0.75rem; display: flex; align-items: center; gap: 6px; border-radius: 4px; cursor: pointer;">
+                <i class="bi bi-currency-dollar" style="font-size: 14px;"></i>
+                <span>Tipo de cambio</span>
+            </button>
+            
+            <button type="button" @onclick="() => ToggleDrawer(!mostrarCatalogo)" class="btn-pos-secondary" style="height: 32px; padding: 0 0.75rem; font-size: 0.75rem; display: flex; align-items: center; gap: 6px; border-radius: 4px; cursor: pointer;">
+                @if (mostrarCatalogo)
+                {
+                    <i class="bi bi-eye-slash-fill" style="font-size: 14px;"></i>
+                }
+                else
+                {
+                    <i class="bi bi-eye-fill" style="font-size: 14px;"></i>
+                }
+                <span>@(mostrarCatalogo ? "Ocultar catálogo" : "Mostrar catálogo")</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- POS Top Input Grid (KeyFacil Style: 12-Column Double Row) -->
+    <div class="pos-header-grid-keyfacil" id="pos-header-grid">
+        <!-- Cliente -->
+        <div class="pos-border-label-group col-span-4" style="position: relative;">
+            <label for="cliente">Cliente</label>
+            <div style="display: flex; gap: 4px; align-items: center; width: 100%;">
+                <div style="position: relative; flex-grow: 1;">
+                    <input type="text" id="cliente" class="pos-input" placeholder="Buscar o ingresar cliente..."
+                           value="@busquedaClienteText" @oninput="OnInputCliente" @onfocus="OnFocusCliente" @onblur="OnBlurCliente" autocomplete="off" />
+                    @if (mostrarSugerenciasClientes && clientesSugeridos.Any())
+                    {
+                        <div class="pos-client-suggestions-dropdown" style="position: absolute; top: 100%; left: 0; right: 0; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 4px; box-shadow: var(--shadow-md); z-index: 100; max-height: 180px; overflow-y: auto; margin-top: 2px;">
+                            @foreach (var c in clientesSugeridos)
+                            {
+                                <div class="suggestion-item" @mousedown="() => SeleccionarClienteSugerido(c)">
+                                    <div style="font-weight: 600;">@c.Nombre</div>
+                                    <div style="font-size: 0.72rem; color: var(--text-secondary);">Doc: @c.DniRuc</div>
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+                <button type="button" class="pos-btn-header" style="height: 38px; width: 38px; padding: 0; justify-content: center; border-radius: 8px; background: white; border: 1px solid #cbd5e1; color: #475569; display: inline-flex; align-items: center; cursor: pointer;" @onclick="() => mostrarRegistroCliente = true" title="Registrar nuevo cliente">
+                    <i class="bi bi-plus-lg" style="font-size: 1.1rem;"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- RUC / Nro. Documento -->
+        <div class="pos-border-label-group col-span-2">
+            <label for="documento">RUC / Nro. Documento</label>
+            <input type="text" id="documento" class="pos-input" placeholder="Documento..." value="@(clienteSeleccionado?.DniRuc ?? "")" readonly disabled />
+        </div>
+
+        <!-- Fecha Emisión -->
+        <div class="pos-border-label-group col-span-3">
+            <label for="fechaEmision">Fecha de emisión</label>
+            <input type="date" id="fechaEmision" class="pos-input" value="@fechaEmisionNullable?.ToString("yyyy-MM-dd")" @onchange="OnFechaEmisionChanged" />
+        </div>
+
+        <!-- Fecha Vencimiento -->
+        <div class="pos-border-label-group col-span-3">
+            <label for="fechaVcto">Fecha de vcto</label>
+            <input type="date" id="fechaVcto" class="pos-input" value="@fechaVctoNullable?.ToString("yyyy-MM-dd")" @onchange="OnFechaVctoChanged" />
+        </div>
+
+        <!-- Tipo de comprobante -->
+        <div class="pos-border-label-group col-span-3">
+            <label for="tipoComprobante">Tipo de comprobante</label>
+            <select id="tipoComprobante" class="form-select pos-input" @bind="tipoComprobante">
+                <option value="Boleta">BOLETA</option>
+                <option value="Factura">FACTURA</option>
+                <option value="Nota de Venta">NOTA DE VENTA</option>
+                <option value="Proforma">PROFORMA</option>
+            </select>
+        </div>
+
+        <!-- Serie -->
+        <div class="pos-border-label-group col-span-2">
+            <label for="serie">Serie</label>
+            <input type="text" id="serie" class="pos-input" @bind="numeroComprobante" placeholder="Serie..." />
+        </div>
+
+        <!-- Tipo de operación -->
+        <div class="pos-border-label-group col-span-4">
+            <label for="tipoOperacion">Tipo de operación</label>
+            <select id="tipoOperacion" class="form-select pos-input" @bind="tipoOperacion">
+                <option value="VENTA INTERNA">VENTA INTERNA</option>
+                <option value="VENTA EXPORTACION">VENTA EXPORTACION</option>
+            </select>
+        </div>
+
+        <!-- Dscto. global (%) -->
+        <div class="pos-border-label-group col-span-3">
+            <label for="descuentoGlobal">Dscto. global (%)</label>
+            <input type="number" step="0.01" min="0" max="100" id="descuentoGlobal" class="pos-input" @bind="descuentoGlobal" placeholder="0" />
+        </div>
+
+        <!-- Campos Extras: Configuración de IGV y Proforma -->
+        <div style="display: flex; gap: 24px; padding: 12px 0 0 0; border-top: 1px solid #f1f5f9; margin-top: 4px; grid-column: span 12;">
+            <div class="form-check form-switch" style="display: flex; align-items: center; gap: 8px;">
+                <input class="form-check-input" type="checkbox" role="switch" id="incluirIGV" @bind="incluirIGV" style="cursor: pointer;" />
+                <label class="form-check-label fw-bold text-secondary text-sm" for="incluirIGV" style="cursor: pointer;">Incluir IGV (18%)</label>
+            </div>
+            <div class="form-check form-switch" style="display: flex; align-items: center; gap: 8px;">
+                <input class="form-check-input" type="checkbox" role="switch" id="esProforma" @bind="esProforma" style="cursor: pointer;" />
+                <label class="form-check-label fw-bold text-secondary text-sm" for="esProforma" style="cursor: pointer;">Marcar como proforma</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de Acciones (Azul) -->
+    <div class="pos-action-tabs">
+        <button type="button" class="pos-tab-btn @(activeQuickActionPanel == "placa" ? "tab-active" : "")" @onclick='() => ToggleQuickPanel("placa")'>
+            <span>PLACA</span> @(!string.IsNullOrEmpty(placa) ? "✓" : "")
+        </button>
+        <button type="button" class="pos-tab-btn @(activeQuickActionPanel == "orden" ? "tab-active" : "")" @onclick='() => ToggleQuickPanel("orden")'>
+            <span>O. COMPRA</span> @(!string.IsNullOrEmpty(ordenCompra) ? "✓" : "")
+        </button>
+        <button type="button" class="pos-tab-btn @(activeQuickActionPanel == "guia" ? "tab-active" : "")" @onclick='() => ToggleQuickPanel("guia")'>
+            <span>G. REMISIÓN</span> @(!string.IsNullOrEmpty(guiaRemision) ? "✓" : "")
+        </button>
+        <button type="button" class="pos-tab-btn @(activeQuickActionPanel == "obs" ? "tab-active" : "")" @onclick='() => ToggleQuickPanel("obs")'>
+            <span>OBSERVACIONES</span> @(!string.IsNullOrEmpty(observaciones) ? "✓" : "")
+        </button>
+        <button type="button" class="pos-tab-btn" @onclick="ToggleCondicionPago">
+            <span>COND. PAGO: @condicionPago.ToUpper()</span>
+        </button>
+    </div>
+
+    <!-- Panel de inputs desplegables para acciones rápidas -->
+    @if (!string.IsNullOrEmpty(activeQuickActionPanel))
+    {
+        <div class="p-3 border rounded bg-white" style="border-radius: 12px; border: 1px solid #e2e8f0; animation: pageEnter 0.2s;">
+            @if (activeQuickActionPanel == "placa")
+            {
+                <div class="pos-field-group">
+                    <label class="pos-field-label">Placa del Vehículo</label>
+                    <input type="text" class="pos-input" @bind="placa" placeholder="Ej: ABC-123" />
+                </div>
+            }
+            else if (activeQuickActionPanel == "orden")
+            {
+                <div class="pos-field-group">
+                    <label class="pos-field-label">Orden de Compra</label>
+                    <input type="text" class="pos-input" @bind="ordenCompra" placeholder="Número de Orden de Compra" />
+                </div>
+            }
+            else if (activeQuickActionPanel == "guia")
+            {
+                <div class="pos-field-group">
+                    <label class="pos-field-label">Guía de Remisión</label>
+                    <input type="text" class="pos-input" @bind="guiaRemision" placeholder="Número de Guía de Remisión" />
+                </div>
+            }
+            else if (activeQuickActionPanel == "obs")
+            {
+                <div class="pos-field-group">
+                    <label class="pos-field-label">Observaciones internas de venta</label>
+                    <textarea class="pos-input" style="height: auto;" rows="2" @bind="observaciones" placeholder="Escribe observaciones aquí..."></textarea>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- Area Central (Workspace Dividido) -->
+    <div class="pos-main-workspace">
+        <!-- Catalog Sidebar -->
+        @if (mostrarCatalogo)
+        {
+            <div class="pos-catalog-column" id="catalog-sidebar">
+                <div class="pos-column-title">
+                    <i class="bi bi-file-earmark-text text-primary"></i>
+                    <span>Catálogo</span>
+                    <span style="font-size: 0.75rem; font-weight: normal; margin-left: auto; background: var(--border-color); padding: 2px 6px; border-radius: 4px; color: var(--text-secondary);">
+                        @productosFiltrados.Count Items
+                    </span>
+                </div>
+                
+                <!-- Buscador -->
+                <div class="p-2 border-bottom">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control pos-input border-start-0 pos-search-compact" placeholder="Buscar producto..."
+                               value="@busquedaProducto" @oninput="FiltrarProductosDebounceInput" />
+                    </div>
+                </div>
+
+                <!-- Filtro Categoría -->
+                <div class="p-2 border-bottom d-flex gap-1 overflow-auto" style="white-space: nowrap;">
+                    <button class="btn btn-sm @(selectedCategory == "" ? "btn-primary" : "btn-outline-secondary")" @onclick='() => SelectCategory("")'>Todos</button>
+                    @foreach (var cat in listCategories)
+                    {
+                        <button class="btn btn-sm @(selectedCategory == cat ? "btn-primary" : "btn-outline-secondary")" @onclick="() => SelectCategory(cat)">@cat</button>
+                    }
+                </div>
+
+                <div class="pos-scrollable" id="catalog-item-results">
+                    @if (productosFiltrados.Any())
+                    {
+                        @foreach (var prod in productosFiltrados)
+                        {
+                            <div class="catalog-item-row" @onclick="() => AgregarAlCarrito(prod)" style="padding: 0.45rem 0.65rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.2s; display: flex; justify-content: space-between; align-items: center;">
+                                <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1;">
+                                    <span style="font-weight: 600; font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary);">@prod.Nombre</span>
+                                    <div style="display: flex; gap: 6px; align-items: center;">
+                                        <span class="sku-badge" style="font-size: 9px; padding: 0px 4px;">@prod.CodigoBarras</span>
+                                        <span style="font-size: 0.78rem; font-weight: 700; color: var(--primary);">S/ @prod.PrecioVenta.ToString("N2")</span>
+                                    </div>
+                                </div>
+                                <button type="button" class="catalog-item-add-btn" style="width: 24px; height: 24px; border-radius: 4px; background: var(--bg-primary); border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer;" @onclick:stopPropagation @onclick="() => AgregarAlCarrito(prod)">
+                                    <i class="bi bi-plus"></i>
+                                </button>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="empty-state-container" style="padding: 1.5rem 0.5rem; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 0.5rem;">
+                            <i class="bi bi-question-circle" style="font-size: 28px; opacity: 0.3;"></i>
+                            <span style="font-size: 0.78rem; color: var(--text-muted);">No hay productos coincidentes</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Cart Column -->
+        <div class="pos-cart-column" id="quote-creation-panel">
+            <div class="pos-column-title">
+                <i class="bi bi-cart text-primary"></i>
+                <span>Items de Cotización</span>
+                @if (carrito.Any())
+                {
+                    <span style="font-size: 0.75rem; font-weight: bold; margin-left: auto; background: var(--primary); color: white; padding: 2px 8px; border-radius: 10px;">
+                        @carrito.Count Artículos
+                    </span>
+                }
+            </div>
+            
+            <div class="pos-scrollable" style="padding: 0;">
+                @if (!carrito.Any())
+                {
+                    <div class="barcode-placeholder" id="empty-state-cart">
+                        <div class="barcode-graphic-wrapper">
+                            <svg width="96" height="96" viewBox="0 0 96 96" fill="none" xmlns="http://www.w3.org/2000/svg" style="color: #64748B;">
+                                <path d="M12 28V16C12 13.7909 13.7909 12 16 12H28" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+                                <path d="M68 12H80C82.2091 12 84 13.7909 84 16V28" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+                                <path d="M84 68V80C84 82.2091 82.2091 84 80 84H68" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+                                <path d="M28 84H16C13.7909 84 12 82.2091 12 80V68" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+                                <line x1="16" y1="48" x2="80" y2="48" stroke="#EF4444" stroke-width="3" stroke-dasharray="3 3" stroke-linecap="round" />
+                                <rect x="24" y="22" width="4" height="52" rx="1.5" fill="currentColor" />
+                                <rect x="32" y="22" width="8" height="52" rx="1.5" fill="currentColor" />
+                                <rect x="44" y="22" width="3" height="52" rx="1.5" fill="currentColor" />
+                                <rect x="51" y="22" width="6" height="52" rx="1.5" fill="currentColor" />
+                                <rect x="61" y="22" width="8" height="52" rx="1.5" fill="currentColor" />
+                                <rect x="72" y="22" width="4" height="52" rx="1.5" fill="currentColor" />
+                            </svg>
+                        </div>
+                        <div class="barcode-placeholder-text">
+                            Escanea un producto con un lector de código de barras o búscalo manualmente
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <table class="premium-table pos-compact-table" id="cart-items-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; padding: 0.5rem;">Descripción / SKU</th>
+                                <th style="width: 100px; text-align: center;">Cantidad</th>
+                                <th style="width: 110px; text-align: right;">P. Unitario</th>
+                                <th style="width: 100px; text-align: right;">Total</th>
+                                <th style="width: 40px; text-align: center;"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in carrito)
+                            {
+                                <tr id="cart-row-@item.ProductoId" style="border-bottom: 1px solid var(--border-color);">
+                                    <td style="padding: 0.5rem;">
+                                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                                            <span style="font-weight: 600; font-size: 0.8rem; color: var(--text-primary);">@item.Nombre</span>
+                                            <div style="display: flex; gap: 4px; align-items: center;">
+                                                <span class="sku-badge" style="font-size: 8px; padding: 0px 3px;">@item.ProductoId</span>
+                                                <span style="font-size: 8px; padding: 0px 3px; background: var(--bg-primary); border-radius: 3px; color: var(--text-secondary);">
+                                                    U.M: @item.Almacen
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    
+                                    <!-- Quantity controls -->
+                                    <td style="text-align: center;">
+                                        <div class="qty-control-wrapper" id="qty-control-@item.ProductoId" style="display: inline-flex; align-items: center; height: 28px; border: 1px solid var(--border-color); border-radius: 4px; overflow: hidden; background: var(--bg-secondary);">
+                                            <button type="button" class="qty-control-btn" @onclick="() => CambiarCantidad(item, -1)" style="border: none; background: transparent; width: 22px; height: 100%; cursor: pointer; color: var(--text-secondary);">
+                                                <i class="bi bi-minus" style="font-size: 10px;"></i>
+                                            </button>
+                                            <input type="number" class="qty-control-input" value="@item.Cantidad" @onchange="@(e => OnCantidadItemChanged(item, e.Value))" id="qty-input-@item.ProductoId" min="1" step="1" style="border-left: 1px solid var(--border-color); border-right: 1px solid var(--border-color); border-top: none; border-bottom: none; background: transparent; width: 32px; height: 100%; text-align: center; font-size: 0.8rem; font-weight: bold; color: var(--text-primary); outline: none;" />
+                                            <button type="button" class="qty-control-btn" @onclick="() => CambiarCantidad(item, 1)" style="border: none; background: transparent; width: 22px; height: 100%; cursor: pointer; color: var(--text-secondary);">
+                                                <i class="bi bi-plus" style="font-size: 10px;"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                    
+                                    <!-- Unit price -->
+                                    <td style="text-align: right;">
+                                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">
+                                            S/ @item.PrecioUnitarioIGV.ToString("N2")
+                                        </span>
+                                    </td>
+                                    
+                                    <!-- Row subtotal -->
+                                    <td style="text-align: right; font-weight: 600; font-size: 0.82rem; color: var(--text-primary); padding-right: 0.5rem;">
+                                        S/ @item.TotalItem.ToString("N2")
+                                    </td>
+                                    
+                                    <!-- Remove item button -->
+                                    <td style="text-align: center;">
+                                        <button type="button" class="btn-icon-delete" @onclick="() => EliminarDelCarrito(item)" style="border: none; background: transparent; color: #ef4444; cursor: pointer; padding: 4px; border-radius: 4px;">
+                                            <i class="bi bi-trash-fill" style="font-size: 13px;"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Sticky Bar Inferior -->
+    <div class="pos-bottom-bar">
+        <!-- Left: SKU Scanner -->
+        <div class="search-box-wrapper" style="display: block; flex: 1; max-width: 40%; position: relative;">
+            <input type="text" class="search-input" style="height: 40px; padding-left: 2.25rem; font-size: 0.85rem;" placeholder="Escanea SKU o escribe nombre..."
+                   @bind="barcodeInput" @onkeydown="OnBarcodeKeyDown" />
+            <i class="bi bi-search search-icon" style="position: absolute; left: 0.85rem; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+        </div>
+        
+        <!-- Right: Total and actions -->
+        <div class="pos-bottom-right-group">
+            <!-- Total Neto Panel -->
+            <div class="pos-total-panel" style="display: flex; flex-direction: column; height: auto; padding: 10px 14px; align-items: flex-end; justify-content: center;">
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+                    @if (descuentoGlobal > 0)
+                    {
+                        <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 1px; margin-right: 0.5rem;">
+                            <span style="font-size: 0.62rem; color: var(--text-muted); font-weight: 700;">DSCTO. GLOBAL (@descuentoGlobal%)</span>
+                            <span style="font-size: 0.78rem; color: #ef4444; font-weight: bold;">-S/ @descuentoTotal.ToString("N2")</span>
+                        </div>
+                        <div style="width: 1px; height: 24px; background: var(--border-color); margin-right: 0.5rem;"></div>
+                    }
+                    <span class="pos-total-label">TOTAL NETO</span>
+                    <span class="pos-total-value" id="summary-total" style="margin: 0;">S/ @total.ToString("N2")</span>
+                </div>
+            </div>
+            
+            <!-- Action buttons -->
+            <div class="pos-bottom-actions">
+                <button type="button" class="btn-pos-secondary btn-pos-action" @onclick="AbrirVistaPrevia" disabled="@(!carrito.Any())">
+                    VISTA PREVIA
+                </button>
+                <button type="button" class="btn-pos-primary btn-pos-action" @onclick="FinalizarVenta" disabled="@(!carrito.Any())">
+                    PROCESAR
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODALES EN CSS PURO -->
+@if (mostrarVistaPrevia)
+{
+    <div class="custom-modal-backdrop" @onclick="() => mostrarVistaPrevia = false"></div>
+    <div class="custom-modal show">
+        <div class="custom-modal-header bg-light">
+            <h5 class="m-0 fw-bold text-dark">Vista Previa del Comprobante</h5>
+            <button type="button" class="btn-close" @onclick="() => mostrarVistaPrevia = false"></button>
+        </div>
+        <div class="custom-modal-body">
+            <div class="p-3 bg-light rounded" style="font-family: monospace; font-size: 0.9rem; line-height: 1.4;">
+                <div class="text-center mb-3">
+                    <strong>ELITE POS - COMPROBANTE PREVIO</strong>
+                </div>
+                <hr />
+                <div>Cliente: @(clienteSeleccionado?.Nombre ?? "Cliente General")</div>
+                <div>Documento: @(clienteSeleccionado?.DniRuc ?? "N/A")</div>
+                <div>Tipo: @tipoComprobante</div>
+                <div>Fecha Emisión: @fechaEmision.ToString("dd/MM/yyyy")</div>
+                <hr />
+                @foreach (var item in carrito)
+                {
+                    <div class="d-flex justify-content-between">
+                        <span>@item.Nombre x @item.Cantidad</span>
+                        <span>S/ @item.TotalItem.ToString("N2")</span>
+                    </div>
+                }
+                <hr />
+                <div class="d-flex justify-content-between">
+                    <span>Subtotal:</span>
+                    <span>S/ @subtotal.ToString("N2")</span>
+                </div>
+                @if (incluirIGV)
+                {
+                    <div class="d-flex justify-content-between">
+                        <span>IGV (18%):</span>
+                        <span>S/ @igv.ToString("N2")</span>
+                    </div>
+                }
+                @if (descuentoTotal > 0)
+                {
+                    <div class="d-flex justify-content-between text-danger">
+                        <span>Descuento:</span>
+                        <span>- S/ @descuentoTotal.ToString("N2")</span>
+                    </div>
+                }
+                <hr />
+                <div class="d-flex justify-content-between fw-bold text-success" style="font-size: 1.1rem;">
+                    <span>TOTAL:</span>
+                    <span>S/ @total.ToString("N2")</span>
+                </div>
+            </div>
+        </div>
+        <div class="custom-modal-footer">
+            <button class="btn btn-primary" @onclick="() => mostrarVistaPrevia = false">Cerrar</button>
+        </div>
+    </div>
+}
+
+@if (mostrarMenuOtros)
+{
+    <div class="custom-modal-backdrop" @onclick="CerrarMenuOtros"></div>
+    <div class="custom-modal show">
+        <div class="custom-modal-header bg-light">
+            <h5 class="m-0 fw-bold text-dark">Acciones del Terminal</h5>
+            <button type="button" class="btn-close" @onclick="CerrarMenuOtros"></button>
+        </div>
+        <div class="custom-modal-body d-flex flex-column gap-2">
+            <button class="btn btn-outline-secondary w-100 text-start py-2 d-flex align-items-center gap-2" @onclick="() => { CerrarMenuOtros(); NuevaVenta(); }">
+                <i class="bi bi-plus-square"></i> Nueva Venta
+            </button>
+            <button class="btn btn-outline-secondary w-100 text-start py-2 d-flex align-items-center gap-2" @onclick="() => { CerrarMenuOtros(); VerHistorial(); }">
+                <i class="bi bi-clock-history"></i> Historial
+            </button>
+            <button class="btn btn-outline-secondary w-100 text-start py-2 d-flex align-items-center gap-2" @onclick="() => { CerrarMenuOtros(); Imprimir(); }">
+                <i class="bi bi-printer"></i> Imprimir Ticket
+            </button>
+            <button class="btn btn-outline-secondary w-100 text-start py-2 d-flex align-items-center gap-2" @onclick="() => { CerrarMenuOtros(); ExportarPDF(); }">
+                <i class="bi bi-file-earmark-pdf"></i> Exportar PDF
+            </button>
+            <button class="btn btn-outline-secondary w-100 text-start py-2 d-flex align-items-center gap-2" @onclick="() => { CerrarMenuOtros(); Ajustes(); }">
+                <i class="bi bi-gear"></i> Ajustes
+            </button>
+        </div>
+        <div class="custom-modal-footer">
+            <button class="btn btn-primary" @onclick="CerrarMenuOtros">Cerrar</button>
+        </div>
+    </div>
+}
+
+@if (mostrarRegistroCliente)
+{
+    <div class="custom-modal-backdrop" @onclick="() => mostrarRegistroCliente = false"></div>
+    <div class="custom-modal show">
+        <div class="custom-modal-header bg-light">
+            <h5 class="m-0 fw-bold text-dark">Registrar Nuevo Cliente</h5>
+            <button type="button" class="btn-close" @onclick="() => mostrarRegistroCliente = false"></button>
+        </div>
+        <div class="custom-modal-body d-flex flex-column gap-3">
+            <div>
+                <label class="form-label fw-bold text-secondary text-sm mb-1">Nombre / Razón Social</label>
+                <input type="text" class="form-control pos-input" @bind="nuevoClienteNombre" placeholder="Ej: Constructora Andina SAC" />
+            </div>
+            <div>
+                <label class="form-label fw-bold text-secondary text-sm mb-1">DNI / RUC</label>
+                <input type="text" class="form-control pos-input" @bind="nuevoClienteDniRuc" placeholder="Ej: 20123456789" />
+            </div>
+            <div>
+                <label class="form-label fw-bold text-secondary text-sm mb-1">Dirección</label>
+                <input type="text" class="form-control pos-input" @bind="nuevoClienteDireccion" placeholder="Dirección del cliente" />
+            </div>
+            <div>
+                <label class="form-label fw-bold text-secondary text-sm mb-1">Teléfono</label>
+                <input type="text" class="form-control pos-input" @bind="nuevoClienteTelefono" placeholder="Teléfono de contacto" />
+            </div>
+        </div>
+        <div class="custom-modal-footer">
+            <button class="btn btn-outline-secondary" @onclick="() => mostrarRegistroCliente = false">Cancelar</button>
+            <button class="btn btn-primary" @onclick="GuardarNuevoCliente">Registrar</button>
+        </div>
+    </div>
+}
+
+@code {
+    // Listas principales
+    private List<ProductoModel> listaProductos = new List<ProductoModel>();
+    private List<ClienteModel> listaClientes = new List<ClienteModel>();
+    
+    // Filtrados
+    private List<ProductoModel> productosFiltrados = new List<ProductoModel>();
+    private List<ClienteModel> clientesFiltrados = new List<ClienteModel>();
+    private List<string> listCategories = new List<string>();
+    private string selectedCategory = "";
+    
+    // UI states
+    private string busquedaCliente = "";
+    private string busquedaProducto = "";
+    private string barcodeInput = "";
+    private bool mostrarCatalogo = false;
+    private bool mostrarVistaPrevia = false;
+    private bool mostrarMenuOtros = false;
+    private bool mostrarRegistroCliente = false;
+    private string activeQuickActionPanel = "";
+    
+    // Autocomplete Clientes Auxiliares
+    private string busquedaClienteText = "";
+    private List<ClienteModel> clientesSugeridos = new List<ClienteModel>();
+    private bool mostrarSugerenciasClientes = false;
+
+    // Form variables
+    private string tipoComprobante = "";
+    private string numeroComprobante = "";
+    private bool incluirIGV = true;
+    private decimal descuentoGlobal = 0;
+    private string tipoOperacion = "VENTA INTERNA";
+    
+    // Datepickers bindings
+    private DateTime? fechaEmisionNullable = DateTime.Now;
+    private DateTime? fechaVctoNullable = DateTime.Now.AddDays(15);
+    
+    // Quick action variables
+    private string placa = "";
+    private string ordenCompra = "";
+    private string guiaRemision = "";
+    private string observaciones = "";
+    private string condicionPago = "Contado";
+    private int condicionPagoId = 1;
+    private bool esProforma = false;
+    
+    // Register client variables
+    private string nuevoClienteNombre = "";
+    private string nuevoClienteDniRuc = "";
+    private string nuevoClienteDireccion = "";
+    private string nuevoClienteTelefono = "";
+    
+    // DateTime standard getters
+    private DateTime fechaEmision => fechaEmisionNullable ?? DateTime.Now;
+    private DateTime fechaVcto => fechaVctoNullable ?? DateTime.Now.AddDays(15);
+    
+    // Checkout y carrito
+    private List<CarritoItem> carrito = new List<CarritoItem>();
+    private ClienteModel clienteSeleccionado = new ClienteModel();
+    
+    // Computed totals
+    private decimal totalBruto => carrito.Sum(item => item.PrecioUnitarioIGV * item.Cantidad);
+    private decimal subtotal => incluirIGV ? totalBruto / 1.18m : totalBruto;
+    private decimal igv => incluirIGV ? totalBruto - subtotal : 0;
+    private decimal descuentoTotal => totalBruto * (descuentoGlobal / 100);
+    private decimal total => totalBruto - descuentoTotal;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SesionService.CargarSesionDesdeStorage();
+        if (SesionService.UsuarioActual == null)
+        {
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+        
+        await CargarDatosIniciales();
+    }
+
+    private async Task CargarDatosIniciales()
+    {
+        try
+        {
+            // Cargar productos
+            var productosServicio = await InventarioService.ObtenerProductos();
+            listaProductos = productosServicio.ToList();
+            
+            if (!listaProductos.Any())
+            {
+                listaProductos = new List<ProductoModel>
+                {
+                    new ProductoModel { id = "1", nombre = "ARENA DE RIO", codigoBarras = "123456", stock = 50, precioVenta = 25.50m, categoria = "Construccion" },
+                    new ProductoModel { id = "2", nombre = "CEMENTO PORTLAND", codigoBarras = "789012", stock = 100, precioVenta = 35.80m, categoria = "Construccion" },
+                    new ProductoModel { id = "3", nombre = "LADRILLO KK 18H", codigoBarras = "345678", stock = 200, precioVenta = 2.50m, categoria = "Construccion" },
+                    new ProductoModel { id = "4", nombre = "CLAVOS 3\"", codigoBarras = "901234", stock = 500, precioVenta = 0.15m, categoria = "Ferreteria" },
+                    new ProductoModel { id = "5", nombre = "ALAMBRE #8", codigoBarras = "567890", stock = 100, precioVenta = 8.75m, categoria = "Ferreteria" }
+                };
+            }
+            
+            productosFiltrados = listaProductos;
+            listCategories = listaProductos.Select(p => p.Categoria).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
+            
+            // Cargar clientes
+            var clientesServicio = await ClientesService.ObtenerClientes();
+            listaClientes = clientesServicio.ToList();
+            
+            if (!listaClientes.Any())
+            {
+                listaClientes = new List<ClienteModel>
+                {
+                    new ClienteModel { id = "1", nombre = "CONSTRUCTORA ANDINA SAC", dniRuc = "20123456789", telefono = "987654321", direccion = "Av. Principal 123" },
+                    new ClienteModel { id = "2", nombre = "JUAN PEREZ GARCIA", dniRuc = "12345678", telefono = "912345678", direccion = "Calle Secundaria 456" },
+                    new ClienteModel { id = "3", nombre = "INVERSIONES DEL NORTE", dniRuc = "20567890123", telefono = "998877665", direccion = "Jiron Central 789" }
+                };
+            }
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando datos: {ex.Message}");
+        }
+    }
+
+    // Autocomplete helper search function
+    private Task<IEnumerable<ClienteModel>> BuscarClienteAutocomplete(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+            return Task.FromResult<IEnumerable<ClienteModel>>(listaClientes);
+            
+        var matches = listaClientes.Where(c => 
+            (c.Nombre != null && c.Nombre.Contains(value, StringComparison.InvariantCultureIgnoreCase)) || 
+            (c.DniRuc != null && c.DniRuc.Contains(value))
+        );
+        return Task.FromResult(matches);
+    }
+
+    private async Task OnInputCliente(ChangeEventArgs e)
+    {
+        busquedaClienteText = e.Value?.ToString() ?? "";
+        if (string.IsNullOrEmpty(busquedaClienteText))
+        {
+            clientesSugeridos = listaClientes;
+        }
+        else
+        {
+            var results = await BuscarClienteAutocomplete(busquedaClienteText, default);
+            clientesSugeridos = results.ToList();
+        }
+        mostrarSugerenciasClientes = true;
+    }
+
+    private void OnFocusCliente()
+    {
+        clientesSugeridos = listaClientes;
+        mostrarSugerenciasClientes = true;
+    }
+
+    private async Task OnBlurCliente()
+    {
+        await Task.Delay(200);
+        mostrarSugerenciasClientes = false;
+    }
+
+    private void SeleccionarClienteSugerido(ClienteModel cliente)
+    {
+        OnClienteSelected(cliente);
+        busquedaClienteText = cliente?.Nombre ?? "";
+        mostrarSugerenciasClientes = false;
+    }
+
+    private void OnClienteSelected(ClienteModel cliente)
+    {
+        clienteSeleccionado = cliente ?? new ClienteModel();
+        busquedaCliente = clienteSeleccionado.dniRuc;
+        busquedaClienteText = clienteSeleccionado.Nombre ?? "";
+    }
+
+    private void ToggleDrawer(bool value)
+    {
+        mostrarCatalogo = value;
+    }
+
+    private void SelectCategory(string category)
+    {
+        selectedCategory = category;
+        FiltrarProductos();
+    }
+
+    private void FiltrarProductos()
+    {
+        var query = listaProductos.AsQueryable();
+        
+        if (!string.IsNullOrEmpty(selectedCategory))
+        {
+            query = query.Where(p => p.Categoria == selectedCategory);
+        }
+        
+        if (!string.IsNullOrEmpty(busquedaProducto))
+        {
+            query = query.Where(p => 
+                (p.Nombre != null && p.Nombre.Contains(busquedaProducto, StringComparison.InvariantCultureIgnoreCase)) || 
+                (p.CodigoBarras != null && p.CodigoBarras.Contains(busquedaProducto))
+            );
+        }
+        
+        productosFiltrados = query.ToList();
+    }
+
+    private void FiltrarProductosDebounceInput(ChangeEventArgs e)
+    {
+        busquedaProducto = e.Value?.ToString() ?? "";
+        FiltrarProductos();
+    }
+
+    private void ToggleQuickPanel(string panelName)
+    {
+        if (activeQuickActionPanel == panelName)
+            activeQuickActionPanel = "";
+        else
+            activeQuickActionPanel = panelName;
+    }
+
+    private void ToggleCondicionPago()
+    {
+        condicionPago = condicionPago == "Contado" ? "Credito" : "Contado";
+        condicionPagoId = condicionPago == "Contado" ? 1 : 2;
+    }
+
+    private void AgregarAlCarrito(ProductoModel producto)
+    {
+        var itemExistente = carrito.FirstOrDefault(c => c.ProductoId == producto.Id);
+        if (itemExistente != null)
+        {
+            itemExistente.Cantidad++;
+            itemExistente.TotalItem = itemExistente.PrecioUnitarioIGV * itemExistente.Cantidad - itemExistente.Descuento;
+        }
+        else
+        {
+            carrito.Add(new CarritoItem
+            {
+                ProductoId = producto.Id,
+                Nombre = producto.Nombre,
+                PrecioUnitarioIGV = producto.PrecioVenta,
+                Cantidad = 1,
+                Almacen = "ALMACEN PRINCIPAL",
+                Descuento = 0,
+                TotalItem = producto.PrecioVenta
+            });
+        }
+        _ = NotificationService.ShowInfo($"{producto.Nombre} agregado al carrito");
+    }
+
+    private void CambiarCantidad(CarritoItem item, int cambio)
+    {
+        item.Cantidad += cambio;
+        if (item.Cantidad <= 0)
+        {
+            EliminarDelCarrito(item);
+        }
+        else
+        {
+            item.TotalItem = item.PrecioUnitarioIGV * item.Cantidad - item.Descuento;
+        }
+    }
+
+    private void ActualizarCantidad(CarritoItem item)
+    {
+        item.TotalItem = item.PrecioUnitarioIGV * item.Cantidad - item.Descuento;
+    }
+
+    private void OnCantidadItemChanged(CarritoItem item, object? value)
+    {
+        if (int.TryParse(value?.ToString(), out var cant) && cant >= 1)
+        {
+            item.Cantidad = cant;
+            ActualizarCantidad(item);
+        }
+    }
+
+    private void EliminarDelCarrito(CarritoItem item)
+    {
+        carrito.Remove(item);
+        _ = NotificationService.ShowInfo($"{item.Nombre} eliminado del carrito");
+    }
+
+    private void OnBarcodeKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrEmpty(barcodeInput))
+        {
+            var code = barcodeInput.Trim();
+            var prod = listaProductos.FirstOrDefault(p => 
+                (p.CodigoBarras != null && p.CodigoBarras.Equals(code, StringComparison.InvariantCultureIgnoreCase)) || 
+                (p.Nombre != null && p.Nombre.Equals(code, StringComparison.InvariantCultureIgnoreCase))
+            );
+            
+            if (prod != null)
+            {
+                AgregarAlCarrito(prod);
+            }
+            else
+            {
+                _ = NotificationService.ShowWarning("Producto no encontrado por código");
+            }
+            barcodeInput = "";
+        }
+    }
+
+    private void OnFechaEmisionChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var dt))
+            fechaEmisionNullable = dt;
+        else
+            fechaEmisionNullable = null;
+    }
+
+    private void OnFechaVctoChanged(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var dt))
+            fechaVctoNullable = dt;
+        else
+            fechaVctoNullable = null;
+    }
+
+    private async Task GuardarNuevoCliente()
+    {
+        if (string.IsNullOrWhiteSpace(nuevoClienteNombre) || string.IsNullOrWhiteSpace(nuevoClienteDniRuc))
+        {
+            _ = NotificationService.ShowWarning("Nombre y Documento son requeridos");
+            return;
+        }
+
+        var nuevoCli = new ClienteModel
+        {
+            id = Guid.NewGuid().ToString(),
+            nombre = nuevoClienteNombre,
+            dniRuc = nuevoClienteDniRuc,
+            direccion = nuevoClienteDireccion,
+            telefono = nuevoClienteTelefono
+        };
+
+        try
+        {
+            var success = await ClientesService.AgregarCliente(nuevoCli);
+            if (success)
+            {
+                listaClientes.Add(nuevoCli);
+                clienteSeleccionado = nuevoCli;
+                busquedaCliente = nuevoCli.dniRuc;
+                busquedaClienteText = nuevoCli.Nombre ?? "";
+                mostrarRegistroCliente = false;
+                nuevoClienteNombre = "";
+                nuevoClienteDniRuc = "";
+                nuevoClienteDireccion = "";
+                nuevoClienteTelefono = "";
+                _ = NotificationService.ShowSuccess("Cliente registrado con éxito");
+            }
+            else
+            {
+                _ = NotificationService.ShowError("Error al registrar cliente en el servidor");
+            }
+        }
+        catch (Exception ex)
+        {
+            _ = NotificationService.ShowError($"Error: {ex.Message}");
+        }
+    }
+
+    private async Task FinalizarVenta()
+    {
+        if (!carrito.Any())
+        {
+            _ = NotificationService.ShowWarning("El carrito está vacío");
+            return;
+        }
+
+        try
+        {
+            var subtotalCalculado = subtotal;
+            var igvCalculado = igv;
+            var descuentoCalculado = descuentoTotal;
+            var totalCalculado = total;
+
+            var venta = new VentaModel
+            {
+                id = Guid.NewGuid().ToString(),
+                fechaHora = DateTime.Now,
+                clienteId = clienteSeleccionado?.Id ?? "cliente-general",
+                cliente = clienteSeleccionado?.Nombre ?? "Cliente General",
+                subtotal = subtotalCalculado,
+                subtotalGravada = subtotalCalculado,
+                igv = igvCalculado,
+                total = totalCalculado,
+                placa = placa,
+                ordenCompra = ordenCompra,
+                guiaRemision = guiaRemision,
+                observaciones = observaciones,
+                condicionPago = condicionPago,
+                esProforma = esProforma,
+                fechaVencimiento = fechaVcto,
+                tipoComprobante = tipoComprobante,
+                numeroComprobante = numeroComprobante,
+                tipoOperacion = tipoOperacion,
+                items = carrito.Select(c => new VentaItemModel
+                {
+                    id = Guid.NewGuid().ToString(),
+                    productoId = c.ProductoId,
+                    nombreProducto = c.Nombre,
+                    cantidad = c.Cantidad,
+                    precioUnitario = c.PrecioUnitarioIGV,
+                    precioVenta = c.PrecioUnitarioIGV,
+                    subtotal = c.PrecioUnitarioIGV * c.Cantidad
+                }).ToList()
+            };
+
+            var success = await VentasService.RegistrarVenta(venta);
+            if (success)
+            {
+                await RestarStock();
+                
+                carrito.Clear();
+                clienteSeleccionado = new ClienteModel();
+                busquedaCliente = "";
+                busquedaClienteText = "";
+                placa = "";
+                ordenCompra = "";
+                guiaRemision = "";
+                observaciones = "";
+                condicionPago = "Contado";
+                condicionPagoId = 1;
+                esProforma = false;
+                descuentoGlobal = 0;
+                
+                _ = NotificationService.ShowSuccess("Venta registrada exitosamente");
+                StateHasChanged();
+            }
+            else
+            {
+                _ = NotificationService.ShowError("No se pudo registrar la venta");
+            }
+        }
+        catch (Exception ex)
+        {
+            _ = NotificationService.ShowError($"Error al procesar venta: {ex.Message}");
+        }
+    }
+
+    private async Task RestarStock()
+    {
+        try
+        {
+            foreach (var item in carrito)
+            {
+                var producto = listaProductos.FirstOrDefault(p => p.Id == item.ProductoId);
+                if (producto != null && producto.Stock >= item.Cantidad)
+                {
+                    var nuevoStock = producto.Stock - item.Cantidad;
+                    await InventarioService.ActualizarStock(producto.Id, nuevoStock);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al restar stock: {ex.Message}");
+        }
+    }
+
+    private void CancelarVenta()
+    {
+        carrito.Clear();
+        clienteSeleccionado = new ClienteModel();
+        busquedaCliente = "";
+        busquedaClienteText = "";
+        busquedaProducto = "";
+        placa = "";
+        ordenCompra = "";
+        guiaRemision = "";
+        observaciones = "";
+        condicionPago = "Contado";
+        condicionPagoId = 1;
+        esProforma = false;
+        descuentoGlobal = 0;
+        _ = NotificationService.ShowInfo("Venta cancelada");
+    }
+
+    private void AbrirVistaPrevia()
+    {
+        mostrarVistaPrevia = true;
+    }
+
+    private void MostrarMenuOtros()
+    {
+        mostrarMenuOtros = true;
+    }
+
+    private void CerrarMenuOtros()
+    {
+        mostrarMenuOtros = false;
+    }
+
+    private void NuevaVenta()
+    {
+        CancelarVenta();
+    }
+
+    private void VerHistorial()
+    {
+        _ = NotificationService.ShowInfo("Navegando a historial...");
+    }
+
+    private void Imprimir()
+    {
+        _ = NotificationService.ShowInfo("Imprimiendo comprobante...");
+    }
+
+    private void ExportarPDF()
+    {
+        _ = NotificationService.ShowInfo("Exportando a PDF...");
+    }
+
+    private void Ajustes()
+    {
+        _ = NotificationService.ShowInfo("Abriendo ajustes...");
+    }
+
+    public class CarritoItem
+    {
+        public string ProductoId { get; set; } = string.Empty;
+        public string Nombre { get; set; } = string.Empty;
+        public decimal PrecioUnitarioIGV { get; set; }
+        public int Cantidad { get; set; }
+        public string Almacen { get; set; } = "ALMACEN PRINCIPAL";
+        public decimal Descuento { get; set; }
+        public decimal TotalItem { get; set; }
+    }
+
+    public class CondicionPago
+    {
+        public int Id { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+    }
+}

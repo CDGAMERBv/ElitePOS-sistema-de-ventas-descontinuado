@@ -1,0 +1,121 @@
+﻿@using ElitePOS.Shared.Models
+@using Microsoft.AspNetCore.Components.Forms
+@using ElitePOS.Services
+@implements IDisposable
+@inject HttpClient Http
+@inject IConfiguracionEmpresaService ConfiguracionService
+@inject INotificationService NotificationService
+
+@if (Visible)
+{
+    <div class="modal fade show" style="display: block; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(8px); z-index: 2000;" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content" style="border: none; border-radius: 24px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); overflow: hidden; background: white;">
+                
+                <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 32px; color: white; display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div style="display: flex; gap: 20px; align-items: center;">
+                        <div style="width: 64px; height: 64px; background: #25D366; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: 0 8px 16px rgba(37, 211, 102, 0.3);">
+                            <i class="bi bi-whatsapp"></i>
+                        </div>
+                        <div>
+                            <h2 style="margin: 0; font-size: 24px; font-weight: 800;">WhatsApp AI Config</h2>
+                            <p style="margin: 0; font-size: 14px; color: #94a3b8;">Configura tu bot inteligente de atención al cliente.</p>
+                        </div>
+                    </div>
+                    <button @onclick="OnCerrar" style="background: rgba(255,255,255,0.1); border: none; width: 36px; height: 36px; border-radius: 10px; color: white; cursor: pointer;">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+
+                <div class="modal-body" style="padding: 32px; max-height: 70vh; overflow-y: auto;">
+                    <div class="config-section" style="margin-bottom: 32px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0;">
+                            <div>
+                                <h4 style="margin: 0; font-size: 16px; font-weight: 700; color: #1e293b;">Estado del Asistente</h4>
+                                <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">Habilita o deshabilita la IA en tu línea de WhatsApp.</p>
+                            </div>
+                            <div class="form-check form-switch p-0">
+                                <input class="form-check-input" type="checkbox" role="switch" @bind="localConfig.isEnabled" style="width: 54px; height: 26px; cursor: pointer;" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1.2fr; gap: 32px; margin-bottom: 32px;">
+                        <div style="text-align: center; border: 2px dashed #e2e8f0; border-radius: 20px; padding: 32px; background: #fcfcfc;">
+                            @if (status == "CONNECTED") { <div style="color: #10b981;"><i class="bi bi-check-circle-fill" style="font-size: 64px;"></i><p>WhatsApp Conectado</p></div> }
+                            else { <div style="color: #94a3b8;"><i class="bi bi-qr-code-scan" style="font-size: 64px;"></i><p>Escanea QR para vincular</p></div> }
+                        </div>
+
+                        <div>
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: block; font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 8px;">URL del Microservicio</label>
+                                <input type="text" @bind="localConfig.serviceUrl" class="form-control" placeholder="http://localhost:3000" />
+                            </div>
+                            <div>
+                                <label style="display: block; font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 8px;">ID de Instancia</label>
+                                <input type="text" @bind="localConfig.instanceId" class="form-control" placeholder="empresa_default" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 24px;">
+                        <label style="font-size: 13px; font-weight: 700; color: #475569;">Instrucciones para la IA (Personalidad y Reglas)</label>
+                        <textarea @bind="localConfig.promptPersonalizado" class="form-control" rows="7" placeholder="Escribe aquí cómo quieres que la IA atienda a tus clientes..."></textarea>
+                    </div>
+                </div>
+
+                <div style="padding: 24px 32px; background: #f8fafc; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 16px;">
+                    <button @onclick="OnCerrar" class="btn btn-light">CANCELAR</button>
+                    <button @onclick="ManejarGuardar" class="btn btn-dark" disabled="@guardando">
+                        @if (guardando) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                        <span>GUARDAR CAMBIOS</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public WhatsAppConfigModel Config { get; set; } = new();
+    [Parameter] public EventCallback OnCerrar { get; set; }
+    [Parameter] public EventCallback<WhatsAppConfigModel> OnGuardar { get; set; }
+
+    private WhatsAppConfigModel localConfig = new();
+    private string status = "DISCONNECTED";
+    private bool guardando = false;
+
+    protected override void OnParametersSet()
+    {
+        if (Visible) {
+            localConfig = new WhatsAppConfigModel {
+                isEnabled = Config.isEnabled,
+                serviceUrl = Config.serviceUrl,
+                instanceId = Config.instanceId,
+                botPrompt = Config.botPrompt,
+                promptPersonalizado = Config.promptPersonalizado
+            };
+        }
+    }
+
+    private async Task ManejarGuardar()
+    {
+        try {
+            guardando = true;
+            var configGeneral = await ConfiguracionService.ObtenerConfiguracion();
+            if (configGeneral != null) {
+                configGeneral.integraciones.whatsapp = localConfig;
+                var res = await ConfiguracionService.GuardarConfiguracion(configGeneral);
+                if (res) {
+                    await NotificationService.ShowSuccess("Configuración de WhatsApp guardada");
+                    await OnGuardar.InvokeAsync(localConfig);
+                }
+            }
+        } finally {
+            guardando = false;
+        }
+    }
+
+    public void Dispose() { }
+}

@@ -1,0 +1,180 @@
+rules_version = '2';
+
+// ═══════════════════════════════════════════════════════════════════
+// FIRESTORE SECURITY RULES - ElitePOS
+// ═══════════════════════════════════════════════════════════════════
+// 
+// INSTRUCCIONES DE DESPLIEGUE:
+// 1. Ve a https://console.firebase.google.com/project/TU_FIREBASE_PROJECT_ID/firestore/rules
+// 2. Copia y pega estas reglas
+// 3. Click en "Publicar"
+//
+// NOTA: Estas reglas asumen que implementarás Firebase Authentication
+// en el futuro. Mientras tanto, proporcionan una estructura base
+// que puedes activar cuando migres a Firebase Auth.
+// ═══════════════════════════════════════════════════════════════════
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────────────────
+    // FUNCIÓN HELPER: Verificar si el usuario está autenticado
+    // ─────────────────────────────────────────────────────
+    function estaAutenticado() {
+      return request.auth != null;
+    }
+
+    // ─────────────────────────────────────────────────────
+    // FUNCIÓN HELPER: Verificar rol de Administrador
+    // Lee el documento del usuario autenticado en la colección Usuarios
+    // y verifica que su campo "Rol" sea "Administrador"
+    // ─────────────────────────────────────────────────────
+    function esAdmin() {
+      return estaAutenticado() &&
+        get(/databases/$(database)/documents/Usuarios/$(request.auth.uid)).data.Rol == "Administrador";
+    }
+
+    // ─────────────────────────────────────────────────────
+    // FUNCIÓN HELPER: Verificar que el usuario está activo
+    // ─────────────────────────────────────────────────────
+    function estaActivo() {
+      return estaAutenticado() &&
+        get(/databases/$(database)/documents/Usuarios/$(request.auth.uid)).data.Activo == true;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // VENTAS - Cualquier usuario autenticado y activo puede vender
+    // ═══════════════════════════════════════════════════════
+    match /ventas/{ventaId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create: if estaAutenticado() && estaActivo();
+      allow update: if estaAutenticado() && estaActivo();
+      allow delete: if esAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // PRODUCTOS (Inventario) - Todos leen, solo admin modifica
+    // ═══════════════════════════════════════════════════════
+    match /productos/{productoId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create, update: if estaAutenticado() && estaActivo();
+      allow delete: if esAdmin();
+
+      // Kardex profesional (subcolección de cada producto)
+      match /Kardex/{movimientoId} {
+        allow read: if estaAutenticado() && estaActivo();
+        allow create: if estaAutenticado() && estaActivo();
+        allow update, delete: if esAdmin();
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // KARDEX v2 (colección legacy) - Lectura todos, escritura autenticados
+    // ═══════════════════════════════════════════════════════
+    match /kardex_v2/{movimientoId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create: if estaAutenticado() && estaActivo();
+      allow update, delete: if esAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // CLIENTES - Cualquier usuario autenticado
+    // ═══════════════════════════════════════════════════════
+    match /clientes/{clienteId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create, update: if estaAutenticado() && estaActivo();
+      allow delete: if esAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // COMPRAS - Cualquier usuario autenticado
+    // ═══════════════════════════════════════════════════════
+    match /compras/{compraId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create: if estaAutenticado() && estaActivo();
+      allow update, delete: if esAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // ABONOS - Cualquier usuario autenticado
+    // ═══════════════════════════════════════════════════════
+    match /abonos/{abonoId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create: if estaAutenticado() && estaActivo();
+      allow update, delete: if esAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // GASTOS - Solo administradores
+    // ═══════════════════════════════════════════════════════
+    match /gastos/{gastoId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create, update, delete: if esAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // CAJA - Solo administradores modifican, todos leen
+    // ═══════════════════════════════════════════════════════
+    match /caja/{cajaId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create, update, delete: if esAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // USUARIOS - Solo administradores gestionan
+    // ═══════════════════════════════════════════════════════
+    match /Usuarios/{usuarioId} {
+      // Todos los autenticados pueden leer (necesario para login)
+      allow read: if true;
+      // Solo admin puede crear/editar/eliminar usuarios
+      allow create, update, delete: if esAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // CONFIGURACIÓN - Solo administradores
+    // ═══════════════════════════════════════════════════════
+    match /configuracion_empresa/{docId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create, update, delete: if esAdmin();
+    }
+
+    match /configuracion_sunat/{docId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create, update, delete: if esAdmin();
+    }
+
+    match /configuracion_impresion/{docId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create, update, delete: if esAdmin();
+    }
+
+    match /configuracion_almacenes/{docId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create, update, delete: if esAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // PLANES / SUSCRIPCIÓN - Solo administradores
+    // ═══════════════════════════════════════════════════════
+    match /planes/{planId} {
+      allow read: if estaAutenticado() && estaActivo();
+      allow create, update, delete: if esAdmin();
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // LOGS / AUDITORÍA - Solo admin lee, sistema escribe
+    // ═══════════════════════════════════════════════════════
+    match /logs/{logId} {
+      allow read: if esAdmin();
+      allow create: if estaAutenticado() && estaActivo();
+      allow update, delete: if false;
+    }
+
+    // ═══════════════════════════════════════════════════════
+    // REGLA POR DEFECTO: Denegar todo lo no especificado
+    // ═══════════════════════════════════════════════════════
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

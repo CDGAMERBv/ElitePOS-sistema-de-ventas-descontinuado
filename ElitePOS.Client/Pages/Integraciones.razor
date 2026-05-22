@@ -1,0 +1,299 @@
+﻿@page "/integraciones"
+@using ElitePOS.Client.Services
+@using ElitePOS.Shared.Models
+@using ElitePOS.Client.Components
+@inject IConfiguracionEmpresaService ConfiguracionService
+@inject INotificationService NotificationService
+
+<div class="integraciones-page" style="min-height: 100vh; background: #f8fafc; padding: 20px;">
+    <div style="width: 100%; margin: 0 auto; padding: 0 20px;">
+
+        <!-- HEADER -->
+        <div style="margin-bottom: 32px; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <h1 style="font-size: 26px; font-weight: 800; color: #0f172a; margin: 0 0 8px 0;">Marketplace de Integraciones</h1>
+                <p style="font-size: 14px; color: #64748b; font-weight: 500; margin: 0;">Potencia tu negocio conectando ElitePOS con las mejores herramientas externas.</p>
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; color: #475569; display: flex; align-items: center; gap: 8px;">
+                    <i class="bi bi-shield-check" style="color: #10b981;"></i> Nivel de Seguridad: Alto
+                </div>
+            </div>
+        </div>
+
+        <!-- SEARCH / FILTER (Visual only) -->
+        <div style="margin-bottom: 32px; display: flex; gap: 16px;">
+            <div style="position: relative; flex: 1; max-width: 400px;">
+                <i class="bi bi-search" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                <input type="text" placeholder="Buscar integración..." style="width: 100%; padding: 12px 12px 12px 48px; border-radius: 12px; border: 1px solid #e2e8f0; background: white; font-size: 14px; outline: none; transition: border-color 0.2s;" />
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="filter-chip active">Todos</button>
+                <button class="filter-chip">IA & Bots</button>
+                <button class="filter-chip">Pagos</button>
+                <button class="filter-chip">Envío</button>
+            </div>
+        </div>
+
+        <!-- GRID DE TARJETAS -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 28px;">
+
+            <!-- WhatsApp AI Bot -->
+            <div class="marketplace-card" @onclick="AbrirConfigWhatsApp">
+                <div class="card-header-app">
+                    <div class="app-icon" style="background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);">
+                        <i class="bi bi-whatsapp"></i>
+                    </div>
+                    <div class="status-badge @(config.integraciones.WhatsApp.IsEnabled ? "active" : "inactive")">
+                        @(config.integraciones.WhatsApp.IsEnabled ? "Conectado" : "Disponible")
+                    </div>
+                </div>
+                <div class="card-body-app">
+                    <h3 class="app-title">WhatsApp AI Assistant</h3>
+                    <p class="app-provider">Pro: ElitePOS IA Premium</p>
+                    <p class="app-description">Automatiza la atención al cliente. Un bot inteligente responde consultas de stock, precios y horarios usando Gemini 1.5 Flash.</p>
+                </div>
+                <div class="card-footer-app">
+                    <button class="btn-config">
+                        <i class="bi bi-gear-fill"></i> Configurar
+                    </button>
+                    @if (config.integraciones.WhatsApp.IsEnabled)
+                    {
+                        <span style="font-size: 11px; font-weight: 700; color: #10b981;"><i class="bi bi-check-circle-fill"></i> Bot Activo</span>
+                    }
+                </div>
+            </div>
+
+            <!-- Future: Mercado Pago -->
+            <div class="marketplace-card disabled">
+                <div class="card-header-app">
+                    <div class="app-icon" style="background: #009EE3; opacity: 0.6;">
+                        <i class="bi bi-wallet2"></i>
+                    </div>
+                    <div class="status-badge" style="background: #f1f5f9; color: #94a3b8;">Próximamente</div>
+                </div>
+                <div class="card-body-app">
+                    <h3 class="app-title" style="color: #94a3b8;">Mercado Pago</h3>
+                    <p class="app-provider">Universal Pay</p>
+                    <p class="app-description" style="color: #94a3b8;">Cobra tus ventas directamente con Link de Pago o QR de Mercado Pago sincronizado con tu stock.</p>
+                </div>
+                <div class="card-footer-app">
+                    <button class="btn-config" disabled style="opacity: 0.5;">Ver más</button>
+                </div>
+            </div>
+
+            <!-- Future: Facturación Electrónica Avanzada -->
+            <div class="marketplace-card disabled">
+                <div class="card-header-app">
+                    <div class="app-icon" style="background: #ef4444; opacity: 0.6;">
+                        <i class="bi bi-file-earmark-check"></i>
+                    </div>
+                    <div class="status-badge" style="background: #f1f5f9; color: #94a3b8;">Próximamente</div>
+                </div>
+                <div class="card-body-app">
+                    <h3 class="app-title" style="color: #94a3b8;">SUNAT Pro Sync</h3>
+                    <p class="app-provider">ElitePOS Regulatory</p>
+                    <p class="app-description" style="color: #94a3b8;">Reportes automatizados y validación de comprobantes en tiempo real con alertas de SUNAT.</p>
+                </div>
+                <div class="card-footer-app">
+                    <button class="btn-config" disabled style="opacity: 0.5;">Ver más</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Configuración -->
+<ModalWhatsAppConfig 
+    Visible="@mostrarModalWhatsApp" 
+    Config="@config.integraciones.WhatsApp" 
+    OnCerrar="CerrarConfigWhatsApp" 
+    OnGuardar="GuardarConfigWhatsApp" />
+
+@code {
+    private ConfiguracionEmpresaModel config = new();
+    private bool mostrarModalWhatsApp = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        config = await ConfiguracionService.ObtenerConfiguracion() ?? new();
+        if (config.integraciones == null) config.integraciones = new();
+        if (config.integraciones.WhatsApp == null) config.integraciones.WhatsApp = new();
+    }
+
+    private void AbrirConfigWhatsApp()
+    {
+        mostrarModalWhatsApp = true;
+    }
+
+    private void CerrarConfigWhatsApp()
+    {
+        mostrarModalWhatsApp = false;
+    }
+
+    private async Task GuardarConfigWhatsApp(WhatsAppConfigModel nuevaConfig)
+    {
+        config.integraciones.WhatsApp = nuevaConfig;
+        var success = await ConfiguracionService.GuardarConfiguracion(config);
+        if (success)
+        {
+            await NotificationService.ShowSuccess("Configuración de WhatsApp guardada.");
+            mostrarModalWhatsApp = false;
+        }
+        else
+        {
+            await NotificationService.ShowError("Error al guardar la configuración.");
+        }
+    }
+}
+
+<style>
+.integraciones-page .filter-chip {
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.integraciones-page .filter-chip:hover {
+    border-color: #cbd5e1;
+    color: #475569;
+}
+
+.integraciones-page .filter-chip.active {
+    background: #1e293b;
+    color: white;
+    border-color: #1e293b;
+}
+
+.marketplace-card {
+    background: white;
+    border-radius: 20px;
+    border: 1px solid #e2e8f0;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.marketplace-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 12px 30px -10px rgba(0,0,0,0.1);
+    border-color: #cbd5e1;
+}
+
+.marketplace-card.disabled {
+    cursor: not-allowed;
+}
+
+.marketplace-card.disabled:hover {
+    transform: none;
+    box-shadow: none;
+}
+
+.card-header-app {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.app-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 28px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.status-badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.status-badge.active {
+    background: #ecfdf5;
+    color: #059669;
+}
+
+.status-badge.inactive {
+    background: #fefce8;
+    color: #ca8a04;
+}
+
+.app-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 4px 0;
+}
+
+.app-provider {
+    font-size: 12px;
+    font-weight: 600;
+    color: #6366f1;
+    margin: 0 0 12px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.app-description {
+    font-size: 13px;
+    color: #475569;
+    line-height: 1.6;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.card-footer-app {
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.btn-config {
+    background: #f1f5f9;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.marketplace-card:hover .btn-config {
+    background: #1e293b;
+    color: white;
+}
+</style>
+
+
+
+
+
+

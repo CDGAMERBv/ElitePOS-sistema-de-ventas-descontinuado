@@ -1,0 +1,128 @@
+﻿@page "/reportes/compras-detalladas"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Services
+@inject IComprasService ComprasService
+@inject IInventarioService InventarioService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<style>
+    .r-page { min-height: 100vh; background: #f8fafc; padding: 24px; }
+    .r-card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+</style>
+
+<div class="r-page">
+    <div style="max-width: 1200px; margin: 0 auto;">
+        
+        <div style="margin-bottom: 32px; display: flex; justify-content: space-between; align-items: flex-end;">
+            <div>
+                <button @onclick='() => NavigationManager.NavigateTo("/reportes")' class="btn btn-sm btn-outline-secondary mb-3">
+                    <i class="bi bi-arrow-left me-2"></i> Volver a Reportes
+                </button>
+                <h1 style="font-size: 28px; font-weight: 800; color: #1e293b; margin: 0;">Reporte de Compras Detalladas</h1>
+                <p style="color: #64748b; margin: 4px 0 0 0;">Ingresos de mercadería por producto</p>
+            </div>
+            
+            <div style="display: flex; gap: 12px; align-items: flex-end;">
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: #64748b; display: block; margin-bottom: 4px;">DESDE</label>
+                    <input type="date" @bind="fechaDesde" class="form-control" />
+                </div>
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: #64748b; display: block; margin-bottom: 4px;">HASTA</label>
+                    <input type="date" @bind="fechaHasta" class="form-control" />
+                </div>
+                <button class="btn btn-primary" style="font-weight: 700; height: 38px;" @onclick="ProcesarReporte" disabled="@isConsultando">
+                    @if (isConsultando) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                    PROCESAR
+                </button>
+            </div>
+        </div>
+
+        @if (itemsComprados.Any())
+        {
+            <div class="r-card" style="padding: 0; overflow: hidden;">
+                <table class="table table-hover mb-0" style="font-size: 13px;">
+                    <thead class="bg-light">
+                        <tr>
+                            <th style="padding: 16px;">Fecha</th>
+                            <th style="padding: 16px;">Documento</th>
+                            <th style="padding: 16px;">Proveedor</th>
+                            <th style="padding: 16px;">Producto</th>
+                            <th style="padding: 16px; text-align: center;">Cantidad</th>
+                            <th style="padding: 16px; text-align: right;">Costo Unitario</th>
+                            <th style="padding: 16px; text-align: right;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var i in itemsComprados)
+                        {
+                            <tr>
+                                <td style="padding: 16px;">@i.fecha.ToString("dd/MM/yyyy")</td>
+                                <td style="padding: 16px;"><span class="badge bg-light text-dark">@i.documento</span></td>
+                                <td style="padding: 16px;">@i.proveedor</td>
+                                <td style="padding: 16px; font-weight: 600;">@i.productoNombre</td>
+                                <td style="padding: 16px; text-align: center;">@i.cantidad</td>
+                                <td style="padding: 16px; text-align: right;">S/ @i.precioUnitario.ToString("N2")</td>
+                                <td style="padding: 16px; text-align: right; font-weight: 700; color: #059669;">S/ @i.subtotal.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        else if (!isConsultando && reporteGenerado)
+        {
+            <div class="r-card text-center" style="padding: 60px;">
+                <p style="color: #64748b; font-weight: 600;">No se encontraron registros para este periodo</p>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private DateTime fechaDesde = DateTime.Today.AddMonths(-1);
+    private DateTime fechaHasta = DateTime.Today;
+    private bool isConsultando = false;
+    private bool reporteGenerado = false;
+    private List<ItemComprado> itemsComprados = new();
+
+    private async Task ProcesarReporte()
+    {
+        try
+        {
+            isConsultando = true;
+            reporteGenerado = false;
+            
+            var compras = await ComprasService.ObtenerCompras(fechaDesde, fechaHasta);
+
+            itemsComprados = compras.Select(c => new ItemComprado
+            {
+                fecha = c.fechaCompra,
+                documento = c.numeroDocumento,
+                proveedor = c.proveedor,
+                productoNombre = c.nombreProducto,
+                cantidad = c.cantidad,
+                precioUnitario = c.costoUnitario,
+                subtotal = c.total
+            }).OrderByDescending(i => i.fecha).ToList();
+
+            reporteGenerado = true;
+        }
+        finally
+        {
+            isConsultando = false;
+        }
+    }
+
+    public class ItemComprado
+    {
+        public DateTime fecha { get; set; }
+        public string documento { get; set; } = "";
+        public string proveedor { get; set; } = "";
+        public string productoNombre { get; set; } = "";
+        public int cantidad { get; set; }
+        public decimal precioUnitario { get; set; }
+        public decimal subtotal { get; set; }
+    }
+}

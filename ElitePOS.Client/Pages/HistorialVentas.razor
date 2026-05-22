@@ -1,0 +1,362 @@
+@page "/historial-ventas"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Client.Services
+@using ElitePOS.Services
+@inject IVentasService VentasService
+@inject IInventarioService InventarioService
+@inject IConfiguracionEmpresaService ConfiguracionService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject GestionStateService StateService
+@inject INotificationService NotificationService
+@implements IDisposable
+
+<div class="dashboard-premium px-4 py-6" style="padding: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+        <div>
+            <h3 style="font-weight: 800; font-size: 24px; margin: 0 0 8px 0; color: #111827;">Ventas Realizadas</h3>
+            <p style="margin: 0; color: #6B7280; font-size: 14px;">Registro legal de Boletas y Facturas emitidas (Excluye Proformas)</p>
+        </div>
+        <div>
+            <button class="btn" style="background: white; border: 1px solid #E2E8F0; padding: 10px 20px; border-radius: 8px; font-weight: 600; color: #475569; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.2s;" @onclick="SincronizarSunat" disabled="@sincronizando">
+                @if (sincronizando)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width: 1rem; height: 1rem;"></span>
+                    <span>Sincronizando...</span>
+                }
+                else
+                {
+                    <i class="bi bi-cloud-arrow-up-fill" style="color: #4F46E5;"></i>
+                    <span>Sincronizar SUNAT</span>
+                }
+            </button>
+        </div>
+    </div>
+
+    <!-- Resumen -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 24px;">
+        <div class="glass-card" style="padding: 20px;">
+            <span style="color: #6B7280; font-size: 12px; font-weight: 600; text-transform: uppercase;">Monto Total</span>
+            <h4 style="font-weight: 800; margin: 8px 0; font-size: 24px; color: #10B981;">@simboloMoneda @ventasFiltradas.Where(v => !v.anulada).Sum(v => v.total).ToString("N2")</h4>
+        </div>
+        <div class="glass-card" style="padding: 20px;">
+            <span style="color: #6B7280; font-size: 12px; font-weight: 600; text-transform: uppercase;">Ventas Realizadas</span>
+            <h4 style="font-weight: 800; margin: 8px 0; font-size: 24px; color: #111827;">@ventasFiltradas.Count(v => !v.anulada)</h4>
+        </div>
+        <div class="glass-card" style="padding: 20px;">
+            <span style="color: #6B7280; font-size: 12px; font-weight: 600; text-transform: uppercase;">Ventas Anuladas</span>
+            <h4 style="font-weight: 800; margin: 8px 0; font-size: 24px; color: #EF4444;">@ventasFiltradas.Count(v => v.anulada)</h4>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="glass-card" style="padding: 20px; margin-bottom: 24px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end;">
+        <div style="flex: 1; min-width: 250px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Búsqueda</label>
+            <div style="position: relative;">
+                <i class="bi bi-search" style="position: absolute; left: 12px; top: 12px; color: #94A3B8;"></i>
+                <input type="text" @bind="textoBusqueda" @bind:event="oninput" @onkeyup="FiltrarVentas" placeholder="Buscar por N° comprobante o cliente..." style="width: 100%; padding: 10px 10px 10px 36px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none; transition: border-color 0.2s;" />
+            </div>
+        </div>
+        <div>
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Desde</label>
+            <input type="date" @bind="fechaDesde" @bind:after="CargarVentas" style="padding: 9px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none;" />
+        </div>
+        <div>
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Hasta</label>
+            <input type="date" @bind="fechaHasta" @bind:after="CargarVentas" style="padding: 9px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none;" />
+        </div>
+        <div>
+            <button @onclick="CargarVentas" style="background: #4F46E5; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; height: 42px;">Actualizar</button>
+        </div>
+    </div>
+
+    <!-- Tabla -->
+    <div class="glass-card" style="padding: 24px; overflow-x: auto;">
+        <h5 style="font-weight: 700; margin: 0 0 16px 0; font-size: 16px; color: #111827;">Registro de Transacciones</h5>
+
+        @if (cargando)
+        {
+            <div style="text-align: center; padding: 40px 0;">
+                <p style="color: #6B7280;">Recuperando registros...</p>
+            </div>
+        }
+        else if (ventasFiltradas == null || !ventasFiltradas.Any())
+        {
+            <div style="text-align: center; padding: 40px 0;">
+                <i class="bi bi-receipt" style="font-size: 40px; color: #94A3B8; margin-bottom: 12px; display: block;"></i>
+                <p style="color: #6B7280; font-weight: 500;">@(string.IsNullOrWhiteSpace(textoBusqueda) ? "No existen registros para este periodo" : "Sin coincidencias")</p>
+            </div>
+        }
+        else
+        {
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">HORA</th>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">N° COMPROBANTE</th>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">CLIENTE</th>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">TIPO</th>
+                        <th style="text-align: right; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">TOTAL</th>
+                        <th style="text-align: right; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var venta in ventasFiltradas.OrderByDescending(v => v.fechaHora))
+                    {
+                        <tr>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #F1F5F9; color: #6B7280; font-size: 13px;">@venta.fechaHora.ToString("HH:mm")</td>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #F1F5F9; font-weight: 600; color: #111827; font-size: 14px;">@venta.numeroComprobante</td>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #F1F5F9; color: #475569; font-size: 14px;">@venta.cliente</td>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #F1F5F9;">
+                                <span style="background: #F8FAFC; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; border: 1px solid #E2E8F0;">@venta.tipoComprobante</span>
+                            </td>
+                            <td style="text-align: right; padding: 12px 0; border-bottom: 1px solid #F1F5F9; font-weight: 700; font-size: 14px; color: @(venta.anulada ? "#94A3B8" : "#10B981")">
+                                <span style="@(venta.anulada ? "text-decoration: line-through;" : "")">@simboloMoneda @venta.total.ToString("N2")</span>
+                            </td>
+                            <td style="text-align: right; padding: 12px 0; border-bottom: 1px solid #F1F5F9;">
+                                @if (!venta.anulada)
+                                {
+                                    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                                        <button @onclick="() => AbrirModalDetalle(venta)" style="background: rgba(59, 130, 246, 0.1); color: #3B82F6; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;"><i class="bi bi-eye-fill"></i> Detalle</button>
+                                        <button @onclick="() => AbrirModalAnular(venta)" style="background: rgba(239, 68, 68, 0.1); color: #EF4444; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;"><i class="bi bi-x-circle-fill"></i> Anular</button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <span style="background: rgba(239,68,68,0.1); color: #EF4444; padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 11px;">ANULADA</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<!-- Estilos base para modales nativos -->
+<style>
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(15, 23, 42, 0.6);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+    .modal-content {
+        background: #FFFFFF;
+        border-radius: 16px;
+        padding: 24px;
+        width: 100%;
+        max-width: 500px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .modal-content.large {
+        max-width: 800px;
+    }
+    .detail-row {
+        display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #E2E8F0;
+    }
+    .detail-label {
+        color: #6B7280; font-size: 14px; font-weight: 500;
+    }
+    .detail-value {
+        color: #111827; font-size: 14px; font-weight: 600;
+    }
+</style>
+
+<!-- Modal Detalle -->
+@if (mostrarModalDetalle && ventaSeleccionada != null)
+{
+    <div class="modal-overlay" @onclick="CerrarModalDetalle">
+        <div class="modal-content large" @onclick:stopPropagation>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h5 style="margin: 0; font-size: 18px; font-weight: 700; color: #111827;">Detalle de Venta</h5>
+                <button @onclick="CerrarModalDetalle" style="background: none; border: none; font-size: 20px; color: #94A3B8; cursor: pointer;"><i class="bi bi-x-lg"></i></button>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+                <div>
+                    <div class="detail-row"><span class="detail-label">Comprobante</span><span class="detail-value">@ventaSeleccionada.numeroComprobante</span></div>
+                    <div class="detail-row"><span class="detail-label">Cliente</span><span class="detail-value">@ventaSeleccionada.cliente</span></div>
+                    <div class="detail-row" style="border-bottom: none;"><span class="detail-label">Método Pago</span><span class="detail-value">@ventaSeleccionada.metodoPago</span></div>
+                </div>
+                <div>
+                    <div class="detail-row"><span class="detail-label">Fecha</span><span class="detail-value">@ventaSeleccionada.fechaHora.ToString("dd/MM/yyyy HH:mm")</span></div>
+                    <div class="detail-row"><span class="detail-label">Estado SUNAT</span><span class="detail-value">
+                        <span style="background: @(ventaSeleccionada.estadoSunat == "Aceptado" ? "rgba(16,185,129,0.1)" : "rgba(245,158,11,0.1)"); color: @(ventaSeleccionada.estadoSunat == "Aceptado" ? "#10B981" : "#F59E0B"); padding: 2px 8px; border-radius: 4px; font-size: 12px;">
+                            @ventaSeleccionada.estadoSunat
+                        </span>
+                    </span></div>
+                    <div class="detail-row" style="border-bottom: none;"><span class="detail-label">Registrado por</span><span class="detail-value">@ventaSeleccionada.nombreUsuario</span></div>
+                </div>
+            </div>
+
+            <h6 style="font-weight: 700; margin: 0 0 12px 0; font-size: 15px; color: #374151;">Productos</h6>
+            <div style="overflow-x: auto; margin-bottom: 16px; border: 1px solid #E2E8F0; border-radius: 8px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead style="background: #F8FAFC;">
+                        <tr>
+                            <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding: 10px 12px; border-bottom: 1px solid #E2E8F0;">PRODUCTO</th>
+                            <th style="text-align: center; font-weight: 600; color: #6B7280; font-size: 12px; padding: 10px 12px; border-bottom: 1px solid #E2E8F0;">CANT.</th>
+                            <th style="text-align: right; font-weight: 600; color: #6B7280; font-size: 12px; padding: 10px 12px; border-bottom: 1px solid #E2E8F0;">P. UNIT.</th>
+                            <th style="text-align: right; font-weight: 600; color: #6B7280; font-size: 12px; padding: 10px 12px; border-bottom: 1px solid #E2E8F0;">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if(ventaSeleccionada.items != null)
+                        {
+                            @foreach (var item in ventaSeleccionada.items)
+                            {
+                                <tr>
+                                    <td style="padding: 10px 12px; border-bottom: 1px solid #F1F5F9; font-size: 13px;">@item.nombreProducto</td>
+                                    <td style="text-align: center; padding: 10px 12px; border-bottom: 1px solid #F1F5F9; font-size: 13px;">@item.cantidad</td>
+                                    <td style="text-align: right; padding: 10px 12px; border-bottom: 1px solid #F1F5F9; font-size: 13px;">@simboloMoneda @item.precioUnitario.ToString("N2")</td>
+                                    <td style="text-align: right; padding: 10px 12px; border-bottom: 1px solid #F1F5F9; font-size: 13px; font-weight: 600;">@simboloMoneda @item.subtotal.ToString("N2")</td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; align-items: center; padding-top: 16px;">
+                <h5 style="margin: 0; font-weight: 800; color: #10B981; font-size: 20px;">Total: @simboloMoneda @ventaSeleccionada.total.ToString("N2")</h5>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                <button @onclick="@(() => Reimprimir(ventaSeleccionada))" style="background: white; border: 1px solid #4F46E5; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: #4F46E5; cursor: pointer; display: flex; align-items: center; gap: 8px;"><i class="bi bi-printer-fill"></i> Reimprimir Ticket</button>
+                <button @onclick="CerrarModalDetalle" style="background: #4F46E5; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Anular -->
+@if (mostrarModalAnular && ventaSeleccionada != null)
+{
+    <div class="modal-overlay" @onclick="CerrarModalAnular">
+        <div class="modal-content" @onclick:stopPropagation style="text-align: center; max-width: 400px;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); color: #EF4444; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 32px;">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <h5 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 700; color: #111827;">¿Anular esta venta?</h5>
+            <p style="margin: 0; color: #111827; font-weight: 600;">Comprobante: @ventaSeleccionada.numeroComprobante</p>
+            <p style="margin: 8px 0 24px 0; color: #6B7280; line-height: 1.5; font-size: 14px;">Esta acción es irreversible y restaurará el stock automáticamente.</p>
+            
+            <div style="display: flex; justify-content: center; gap: 12px;">
+                <button @onclick="CerrarModalAnular" style="background: white; border: 1px solid #E2E8F0; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: #475569; cursor: pointer;">Cancelar</button>
+                <button @onclick="ConfirmarAnular" style="background: #EF4444; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer;">Confirmar Anulación</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<VentaModel> ventas = new();
+    private List<VentaModel> ventasFiltradas = new();
+    private VentaModel? ventaSeleccionada = null;
+
+    private DateTime fechaDesde = DateTime.Today.AddDays(-30);
+    private DateTime fechaHasta = DateTime.Today;
+    private string textoBusqueda = string.Empty;
+
+    private bool cargando = true;
+    private bool sincronizando = false;
+    private bool mostrarModalDetalle = false;
+    private bool mostrarModalAnular = false;
+
+    private string simboloMoneda = "S/";
+    private string mensaje = string.Empty;
+    private bool mostrarToast = false;
+    private bool ocultandoToast = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        StateService.OnChange += StateHasChanged;
+        await CargarConfiguracion();
+        await CargarVentas();
+    }
+
+    public void Dispose() => StateService.OnChange -= StateHasChanged;
+
+    private async Task CargarConfiguracion()
+    {
+        var config = await ConfiguracionService.ObtenerConfiguracion();
+        if (config != null) simboloMoneda = config.simboloMoneda;
+    }
+
+    private async Task CargarVentas()
+    {
+        try
+        {
+            cargando = true;
+            var lista = await VentasService.ObtenerVentasPorRango(fechaDesde, fechaHasta);
+            ventas = lista.ToList();
+            FiltrarVentas();
+        }
+        catch { await NotificationService.ShowError("Error al cargar historial"); }
+        finally { cargando = false; }
+    }
+
+    private void FiltrarVentas()
+    {
+        var query = ventas.AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(textoBusqueda))
+        {
+            var term = textoBusqueda.ToLower().Trim();
+            query = query.Where(v =>
+                (v.numeroComprobante != null && v.numeroComprobante.ToLower().Contains(term)) ||
+                (v.cliente != null && v.cliente.ToLower().Contains(term))
+            );
+        }
+
+        ventasFiltradas = query.ToList();
+    }
+
+    private async Task SincronizarSunat()
+    {
+        try
+        {
+            sincronizando = true;
+            var result = await VentasService.ReintentarEnviosSunatPendientes();
+            if (result) { mensaje = "Sincronización SUNAT completada"; await CargarVentas(); }
+            else { mensaje = "No hay envíos pendientes por sincronizar"; }
+        }
+        finally { sincronizando = false; }
+    }
+
+    private void AbrirModalDetalle(VentaModel v) { ventaSeleccionada = v; mostrarModalDetalle = true; }
+    private void CerrarModalDetalle() { mostrarModalDetalle = false; ventaSeleccionada = null; }
+
+    private void AbrirModalAnular(VentaModel v) { ventaSeleccionada = v; mostrarModalAnular = true; }
+    private void CerrarModalAnular() { mostrarModalAnular = false; ventaSeleccionada = null; }
+
+    private async Task ConfirmarAnular()
+    {
+        if (ventaSeleccionada == null) return;
+        var id = ventaSeleccionada.id;
+        CerrarModalAnular();
+
+        try
+        {
+            var success = await VentasService.AnularVenta(id);
+            if (success)
+            {
+                mensaje = "Venta anulada y stock restaurado";
+                await CargarVentas();
+                await StateService.RefreshVentasAsync();
+            }
+        }
+        catch { }
+    }
+
+    private async Task Reimprimir(VentaModel v)
+    {
+        await JSRuntime.InvokeVoidAsync("open", $"/api/impresion/VentaModel/{v.id}/ticket", "_blank");
+    }
+}

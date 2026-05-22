@@ -1,0 +1,138 @@
+@using ElitePOS.Client.Services
+@inject ISesionService SesionService
+@inject ILogsService LogsService
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+@inject INotificationService NotificationService
+
+@if (!SesionService.UsuarioActual.estaAutenticado)
+{
+    <!-- Usuario no autenticado - redirigir a login -->
+    <div></div>
+}
+else if (TieneAcceso)
+{
+    @ChildContent
+}
+else
+{
+    <!-- Usuario autenticado pero sin permisos -->
+    <div style="display: flex; align-items: center; justify-content: center; min-height: 80vh; font-family: 'Inter', sans-serif;">
+        <div style="text-align: center; max-width: 500px; padding: 40px;">
+            <div style="width: 120px; height: 120px; margin: 0 auto 24px; background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; animation: shake 0.5s;">
+                <span style="font-size: 48px;">Í°Å¸â€â€™</span>
+            </div>
+            <h2 style="font-size: 28px; font-weight: 800; color: #dc2626; margin: 0 0 12px 0;">
+                â›” ACCESO DENEGADO
+            </h2>
+            <p style="font-size: 16px; color: #6b7280; margin: 0 0 12px 0;">
+                No tienes permisos para acceder a <strong>@ObtenerNombreModulo(ModuloRequerido)</strong>
+            </p>
+            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 8px; margin: 20px 0;">
+                <p style="font-size: 13px; color: #92400e; margin: 0;">
+                    <strong>Tu rol:</strong> @SesionService.UsuarioActual.rol<br/>
+                    <strong>Acceso requerido:</strong> ADMINISTRADOR
+                </p>
+            </div>
+            <button @onclick="VolverAVentas" 
+                    style="padding: 12px 32px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px; margin-top: 16px; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);">
+                <span class="bi bi-arrow-left"></span> Ir a Ventas
+            </button>
+        </div>
+    </div>
+}
+
+<style>
+    @@keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-10px); }
+        75% { transform: translateX(10px); }
+    }
+</style>
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public string ModuloRequerido { get; set; } = "";
+
+    [Parameter]
+    public bool RedirigirSiNoAutenticado { get; set; } = true;
+
+    private bool TieneAcceso => SesionService.TieneAcceso(ModuloRequerido);
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Verificar autenticación
+        if (!SesionService.UsuarioActual.estaAutenticado && RedirigirSiNoAutenticado)
+        {
+            Console.WriteLine("Í°Å¸Å¡Â« Usuario no autenticado, redirigiendo a /login");
+            Navigation.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+
+        // Verificar permisos
+        if (SesionService.UsuarioActual.estaAutenticado && !TieneAcceso)
+        {
+            Console.WriteLine($"Í°Å¸Å¡Â« Acceso denegado a {ModuloRequerido} para {SesionService.UsuarioActual.rol}");
+
+            // Registrar intento de acceso en logs
+            await LogsService.RegistrarAccesoRestringido(
+                SesionService.UsuarioActual.empresaId,
+                SesionService.UsuarioActual.usuarioId,
+                SesionService.UsuarioActual.nombre,
+                ModuloRequerido
+            );
+
+            // Mostrar alerta
+            await MostrarAlertaAccesoDenegado();
+
+            // Redirigir después de 3 segundos
+            await Task.Delay(3000);
+            Navigation.NavigateTo("/ventas", forceLoad: true);
+        }
+    }
+
+    private async Task MostrarAlertaAccesoDenegado()
+    {
+        try
+        {
+            var rolActual = SesionService.UsuarioActual.rol?.Trim().ToUpper();
+            await NotificationService.ShowError($"ACCESO DENEGADO - No tienes permisos para acceder a {ObtenerNombreModulo(ModuloRequerido)}. Tu rol actual: {rolActual}");
+        }
+
+        catch { /* Ignorar si falla */ }
+    }
+
+    private void VolverAVentas()
+    {
+        Navigation.NavigateTo("/ventas", forceLoad: true);
+    }
+
+    private string ObtenerNombreModulo(string modulo)
+    {
+        return modulo.ToLower() switch
+        {
+            "configuracion" => "Configuración",
+            "empresa" => "Configuración de Empresa",
+            "usuarios" => "Gestión de Usuarios",
+            "plan" => "Suscripción y Plan",
+            "sunat" => "Configuración SUNAT",
+            "almacenes" => "Almacenes",
+            "impresion" => "Configuración de Impresión",
+            "reportes" => "Reportes",
+            "cuentas-cobrar" => "Cuentas por Cobrar",
+            "cuentas-por-cobrar" => "Cuentas por Cobrar",
+            _ => modulo
+        };
+    }
+}
+
+
+
+
+
+
+
+

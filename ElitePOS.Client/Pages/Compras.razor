@@ -1,0 +1,451 @@
+@page "/compras"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Services
+@using ElitePOS.Client.Services
+@using Microsoft.AspNetCore.Components.Forms
+@inject IComprasService ComprasService
+@inject IInventarioService InventarioService
+@inject ISesionService SesionService
+@inject GestionStateService StateService
+@inject INotificationService NotificationService
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+<div class="dashboard-premium px-4 py-6" style="padding: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px;">
+        <div>
+            <h3 style="font-weight: 800; font-size: 24px; margin: 0; color: #111827;">Gestión de Compras</h3>
+        </div>
+        <div>
+            <button class="btn btn-primary" style="background-color: #4F46E5; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;" @onclick="AbrirModalRegistrar">
+                <i class="bi bi-cart-plus" style="margin-right: 8px;"></i> Nueva Compra
+            </button>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="glass-card" style="padding: 20px; margin-bottom: 24px; display: flex; gap: 16px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 250px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Búsqueda</label>
+            <div style="position: relative;">
+                <i class="bi bi-search" style="position: absolute; left: 12px; top: 12px; color: #94A3B8;"></i>
+                <input type="text" @bind="textoBusqueda" @bind:event="oninput" @onkeyup="FiltrarCompras" placeholder="Buscar por proveedor, documento o producto..." style="width: 100%; padding: 10px 10px 10px 36px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none; transition: border-color 0.2s;" />
+            </div>
+        </div>
+        <div style="min-width: 200px;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Fecha</label>
+            <select @bind="filtroFecha" @bind:after="AplicarFiltros" style="width: 100%; padding: 10px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none; background: white;">
+                <option value="Todos">Todas las fechas</option>
+                <option value="Hoy">Registros de Hoy</option>
+                <option value="Rango">Personalizar Rango</option>
+            </select>
+        </div>
+        @if (filtroFecha == "Rango")
+        {
+            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <div>
+                    <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Desde</label>
+                    <input type="date" @bind="fechaDesde" @bind:after="AplicarFiltros" style="padding: 9px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none;" />
+                </div>
+                <span style="padding-bottom: 10px; color: #6B7280; font-size: 14px;">al</span>
+                <div>
+                    <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Hasta</label>
+                    <input type="date" @bind="fechaHasta" @bind:after="AplicarFiltros" style="padding: 9px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none;" />
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Historial de Movimientos -->
+    <div class="glass-card" style="padding: 24px; overflow-x: auto;">
+        <h5 style="font-weight: 700; margin: 0 0 16px 0; font-size: 16px; color: #111827;">Historial de Movimientos</h5>
+
+        @if (cargando)
+        {
+            <div style="text-align: center; padding: 40px 0;">
+                <p style="color: #6B7280;">Recuperando registros...</p>
+            </div>
+        }
+        else if (comprasFiltradas == null || !comprasFiltradas.Any())
+        {
+            <div style="text-align: center; padding: 40px 0;">
+                <i class="bi bi-inbox" style="font-size: 40px; color: #94A3B8; margin-bottom: 12px; display: block;"></i>
+                <p style="color: #6B7280; font-weight: 500;">@(string.IsNullOrWhiteSpace(textoBusqueda) ? "No existen registros para este periodo" : "Sin coincidencias para la búsqueda")</p>
+            </div>
+        }
+        else
+        {
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">FECHA Y HORA</th>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">PROVEEDOR</th>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">DOCUMENTO</th>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">PRODUCTO</th>
+                        <th style="text-align: center; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">CANT.</th>
+                        <th style="text-align: right; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">TOTAL</th>
+                        <th style="text-align: right; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var compra in comprasFiltradas.OrderByDescending(c => c.fechaCompra))
+                    {
+                        <tr>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #F1F5F9; color: #6B7280; font-size: 13px;">@compra.fechaCompra.ToString("dd MMM yyyy HH:mm")</td>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #F1F5F9; font-weight: 600; color: #111827; font-size: 14px;">@compra.proveedor</td>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #F1F5F9; color: #6B7280; font-size: 14px;">@compra.numeroDocumento</td>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #F1F5F9; font-size: 14px; font-weight: 500; color: #4F46E5;">@compra.nombreProducto</td>
+                            <td style="text-align: center; padding: 12px 0; border-bottom: 1px solid #F1F5F9; font-weight: 700; font-size: 14px; color: #111827;">@compra.cantidad</td>
+                            <td style="text-align: right; padding: 12px 0; border-bottom: 1px solid #F1F5F9; font-weight: 700; font-size: 14px; color: #10B981;">S/ @compra.total.ToString("N2")</td>
+                            <td style="text-align: right; padding: 12px 0; border-bottom: 1px solid #F1F5F9;">
+                                <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                                    <button @onclick="() => AbrirModalVer(compra)" style="background: rgba(59, 130, 246, 0.1); color: #3B82F6; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;"><i class="bi bi-eye-fill"></i> Ver</button>
+                                    <button @onclick="() => AbrirModalEliminar(compra)" style="background: rgba(239, 68, 68, 0.1); color: #EF4444; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;"><i class="bi bi-x-circle-fill"></i> Anular</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<!-- Estilos base para modales nativos -->
+<style>
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(15, 23, 42, 0.6);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+    .modal-content {
+        background: #FFFFFF;
+        border-radius: 16px;
+        padding: 24px;
+        width: 100%;
+        max-width: 500px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .form-group {
+        margin-bottom: 16px;
+    }
+    .form-control {
+        width: 100%; padding: 10px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none; transition: border-color 0.2s;
+    }
+    .form-control:focus {
+        border-color: #4F46E5;
+        box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+    }
+    .form-label {
+        display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;
+    }
+    .detail-row {
+        display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #E2E8F0;
+    }
+    .detail-label {
+        color: #6B7280; font-size: 14px; font-weight: 500;
+    }
+    .detail-value {
+        color: #111827; font-size: 14px; font-weight: 600;
+    }
+</style>
+
+<!-- Modal Registrar -->
+@if (mostrarModalRegistrar)
+{
+    <div class="modal-overlay" @onclick="CerrarModalRegistrar">
+        <div class="modal-content" @onclick:stopPropagation>
+            <h5 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700; color: #111827;">Registro de Compra</h5>
+            
+            <div class="form-group"><label class="form-label">Proveedor *</label><input type="text" class="form-control" @bind="nuevaCompra.proveedor" placeholder="Nombre de la empresa o proveedor" /></div>
+            <div class="form-group"><label class="form-label">N° Comprobante *</label><input type="text" class="form-control" @bind="nuevaCompra.numeroDocumento" placeholder="Ej: F001-00045" /></div>
+            <div class="form-group"><label class="form-label">Fecha de Compra</label><input type="date" class="form-control" @bind="nuevaCompra.fechaCompra" /></div>
+            
+            <div class="form-group">
+                <label class="form-label">Producto *</label>
+                <select class="form-control" @bind="productoSeleccionadoId" @bind:after="OnProductoSeleccionado">
+                    <option value="">-- Seleccionar Producto --</option>
+                    @foreach (var p in productos)
+                    {
+                        <option value="@p.id">@p.nombre (@p.codigoBarras)</option>
+                    }
+                </select>
+            </div>
+            
+            <div style="display: flex; gap: 16px;">
+                <div class="form-group" style="flex: 1;"><label class="form-label">Cantidad *</label><input type="number" class="form-control" @bind="nuevaCompra.cantidad" @bind:event="oninput" @bind:after="CalcularTotal" min="1" /></div>
+                <div class="form-group" style="flex: 1;"><label class="form-label">Costo Unitario (S/) *</label><input type="number" step="0.01" class="form-control" @bind="nuevaCompra.costoUnitario" @bind:event="oninput" @bind:after="CalcularTotal" min="0" /></div>
+            </div>
+            
+            <div style="background: rgba(16, 185, 129, 0.1); padding: 16px; border-radius: 8px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: #10B981; font-weight: 600;">Total Compra:</span>
+                <span style="font-size: 20px; font-weight: 800; color: #10B981;">S/ @nuevaCompra.total.ToString("N2")</span>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                <button @onclick="CerrarModalRegistrar" style="background: white; border: 1px solid #E2E8F0; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: #475569; cursor: pointer;">Cancelar</button>
+                <button @onclick="GuardarCompra" style="background: #4F46E5; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer;">Confirmar Registro</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Ver -->
+@if (mostrarModalVer && compraSeleccionada != null)
+{
+    <div class="modal-overlay" @onclick="CerrarModalVer">
+        <div class="modal-content" @onclick:stopPropagation>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h5 style="margin: 0; font-size: 18px; font-weight: 700; color: #111827;">Detalles del Ingreso</h5>
+                <button @onclick="CerrarModalVer" style="background: none; border: none; font-size: 20px; color: #94A3B8; cursor: pointer;"><i class="bi bi-x-lg"></i></button>
+            </div>
+            
+            <div class="detail-row"><span class="detail-label">Fecha</span><span class="detail-value">@compraSeleccionada.fechaCompra.ToString("dd/MM/yyyy HH:mm")</span></div>
+            <div class="detail-row"><span class="detail-label">N° Comprobante</span><span class="detail-value">@compraSeleccionada.numeroDocumento</span></div>
+            <div class="detail-row"><span class="detail-label">Proveedor</span><span class="detail-value">@compraSeleccionada.proveedor</span></div>
+            <div class="detail-row"><span class="detail-label">Producto</span><span class="detail-value" style="color: #4F46E5;">@compraSeleccionada.nombreProducto</span></div>
+            <div class="detail-row"><span class="detail-label">Cantidad</span><span class="detail-value">@compraSeleccionada.cantidad</span></div>
+            <div class="detail-row"><span class="detail-label">Costo Unitario</span><span class="detail-value">S/ @compraSeleccionada.costoUnitario.ToString("N2")</span></div>
+            <div class="detail-row" style="border-bottom: none;"><span class="detail-label">Total</span><span class="detail-value" style="color: #10B981; font-size: 16px;">S/ @compraSeleccionada.total.ToString("N2")</span></div>
+            
+            <div style="margin-top: 16px; padding: 12px; background: #F8FAFC; border-radius: 8px;">
+                <span class="detail-label" style="font-size: 12px;">Registrado por:</span> <span class="detail-value" style="font-size: 12px;">@compraSeleccionada.nombreUsuario</span>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; margin-top: 24px;">
+                <button @onclick="CerrarModalVer" style="background: #4F46E5; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer;">Regresar</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Eliminar -->
+@if (mostrarModalEliminar && compraSeleccionada != null)
+{
+    <div class="modal-overlay" @onclick="CerrarModalEliminar">
+        <div class="modal-content" @onclick:stopPropagation style="text-align: center; max-width: 400px;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); color: #EF4444; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 32px;">
+                <i class="bi bi-x-circle-fill"></i>
+            </div>
+            <h5 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 700; color: #111827;">¿Anular este registro?</h5>
+            <p style="margin: 0 0 24px 0; color: #6B7280; line-height: 1.5;">Esta acción eliminará el registro de la base de datos. <strong style="color: #111827;">No afectará el stock actual del producto.</strong></p>
+            
+            <div style="display: flex; justify-content: center; gap: 12px;">
+                <button @onclick="CerrarModalEliminar" style="background: white; border: 1px solid #E2E8F0; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: #475569; cursor: pointer;">Cerrar</button>
+                <button @onclick="ConfirmarEliminacion" style="background: #EF4444; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer;">Anular Compra</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<CompraModel> compras = new List<CompraModel>();
+    private List<CompraModel> comprasFiltradas = new List<CompraModel>();
+    private List<ProductoModel> productos = new List<ProductoModel>();
+
+    private CompraModel nuevaCompra = new CompraModel();
+    private CompraModel? compraSeleccionada = null;
+    private string productoSeleccionadoId = string.Empty;
+
+    private string textoBusqueda = string.Empty;
+    private bool cargando = true;
+
+    private string filtroFecha = "Todos";
+    private DateTime fechaDesde = DateTime.Today.AddDays(-30);
+    private DateTime fechaHasta = DateTime.Today;
+
+    private bool mostrarModalRegistrar = false;
+    private bool mostrarModalVer = false;
+    private bool mostrarModalEliminar = false;
+
+    private string mensaje = string.Empty;
+    private bool mostrarToast = false;
+    private bool ocultandoToast = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        StateService.OnChange += StateHasChanged;
+        await CargarDatos();
+    }
+
+    public void Dispose()
+    {
+        StateService.OnChange -= StateHasChanged;
+    }
+
+    private async Task CargarDatos()
+    {
+        cargando = true;
+        StateHasChanged();
+
+        try
+        {
+            var comprasObtenidas = await ComprasService.ObtenerCompras(fechaDesde, fechaHasta);
+            compras = comprasObtenidas.ToList();
+            productos = await StateService.GetProductosAsync();
+            FiltrarCompras();
+        }
+        catch (Exception)
+        {
+            mensaje = "Error al intentar sincronizar con Firestore";
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private void FiltrarCompras()
+    {
+        var query = compras.AsEnumerable();
+
+        if (filtroFecha == "Hoy")
+            query = query.Where(c => c.fechaCompra.Date == DateTime.Today);
+        else if (filtroFecha == "Rango")
+            query = query.Where(c => c.fechaCompra.Date >= fechaDesde.Date && c.fechaCompra.Date <= fechaHasta.Date);
+
+        if (!string.IsNullOrWhiteSpace(textoBusqueda))
+        {
+            var term = textoBusqueda.ToLower().Trim();
+            query = query.Where(c =>
+                (c.proveedor?.ToLower().Contains(term) ?? false) ||
+                (c.numeroDocumento?.ToLower().Contains(term) ?? false) ||
+                (c.nombreProducto?.ToLower().Contains(term) ?? false)
+            );
+        }
+
+        comprasFiltradas = query.ToList();
+    }
+
+    private void AplicarFiltros() => FiltrarCompras();
+
+    private void AbrirModalRegistrar()
+    {
+        var sesion = SesionService.usuarioActual;
+        nuevaCompra = new CompraModel
+        {
+            fechaCompra = DateTime.Now,
+            empresaId = sesion?.empresaId ?? "empresa-demo",
+            usuarioId = sesion?.id ?? "usuario-demo",
+            nombreUsuario = sesion?.nombreCompleto ?? "Usuario"
+        };
+        productoSeleccionadoId = string.Empty;
+        mostrarModalRegistrar = true;
+        StateHasChanged();
+    }
+
+    private void CerrarModalRegistrar()
+    {
+        mostrarModalRegistrar = false;
+        StateHasChanged();
+    }
+
+    private void OnProductoSeleccionado()
+    {
+        if (!string.IsNullOrWhiteSpace(productoSeleccionadoId))
+        {
+            var p = productos.FirstOrDefault(x => x.id == productoSeleccionadoId);
+            if (p != null)
+            {
+                nuevaCompra.productoId = p.id;
+                nuevaCompra.nombreProducto = p.nombre;
+                nuevaCompra.costoUnitario = p.precioCompra;
+                CalcularTotal();
+            }
+        }
+    }
+
+    private void CalcularTotal()
+    {
+        nuevaCompra.total = nuevaCompra.cantidad * nuevaCompra.costoUnitario;
+        StateHasChanged();
+    }
+
+    private async Task GuardarCompra()
+    {
+        if (string.IsNullOrWhiteSpace(nuevaCompra.proveedor) || string.IsNullOrWhiteSpace(nuevaCompra.numeroDocumento))
+            return;
+
+        if (string.IsNullOrEmpty(nuevaCompra.productoId) || nuevaCompra.cantidad <= 0)
+            return;
+
+        try
+        {
+            var result = await ComprasService.RegistrarCompra(nuevaCompra);
+
+            if (result.exitoso)
+            {
+                var producto = productos.FirstOrDefault(p => p.id == nuevaCompra.productoId);
+                if (producto != null)
+                {
+                    producto.stock += nuevaCompra.cantidad;
+                    producto.precioCompra = nuevaCompra.costoUnitario;
+                    await InventarioService.EditarProducto(producto);
+                    await StateService.RefreshProductosAsync();
+                }
+
+                await NotificationService.ShowSuccess("Compra registrada e Inventario actualizado");
+                CerrarModalRegistrar();
+                await CargarDatos();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex);
+        }
+    }
+
+    private void AbrirModalVer(CompraModel compra)
+    {
+        compraSeleccionada = compra;
+        mostrarModalVer = true;
+        StateHasChanged();
+    }
+
+    private void CerrarModalVer()
+    {
+        mostrarModalVer = false;
+        compraSeleccionada = null;
+        StateHasChanged();
+    }
+
+    private void AbrirModalEliminar(CompraModel compra)
+    {
+        compraSeleccionada = compra;
+        mostrarModalEliminar = true;
+        StateHasChanged();
+    }
+
+    private void CerrarModalEliminar()
+    {
+        mostrarModalEliminar = false;
+        compraSeleccionada = null;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmarEliminacion()
+    {
+        if (compraSeleccionada == null) return;
+
+        try
+        {
+            var ok = await ComprasService.EliminarCompra(compraSeleccionada.id);
+            if (ok)
+            {
+                await NotificationService.ShowSuccess("Registro de compra anulado correctamente");
+                CerrarModalEliminar();
+                await CargarDatos();
+                await StateService.RefreshComprasAsync();
+            }
+        }
+        catch
+        {
+            // handle error
+        }
+    }
+}

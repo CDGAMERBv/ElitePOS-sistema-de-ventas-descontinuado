@@ -1,0 +1,511 @@
+@using ElitePOS.Services
+@using ElitePOS.Shared.Models
+@implements IDisposable
+@inject IAsistenteIAService AssistantService
+@inject IJSRuntime JS
+
+<div class="chatbot-container">
+    @if (_isOpen)
+    {
+        <div class="chat-window @(_isClosing ? "chat-window-closing" : "")">
+            <div class="chat-header">
+                <div class="header-info">
+                    <div class="bot-avatar">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8c0 3.866-3.582 7-8 7a9 9 0 0 1-2.347-.306c-.584.296-1.925.864-4.181 1.234-.2.032-.352-.176-.273-.362.354-.836.674-1.95.77-2.966C.744 11.37 0 9.76 0 8c0-3.866 3.582-7 8-7s8 3.134 8 7M5 8a1 1 0 1 0-2 0 1 1 0 0 0 2 0m4 0a1 1 0 1 0-2 0 1 1 0 0 0 2 0m3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2"/></svg>
+                    </div>
+                    <div>
+                        <h3>Elite Assistant</h3>
+                        <span class="status-online">En línea</span>
+                    </div>
+                </div>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                @foreach (var msg in _messages.Where(m => !EsMensajeOculto(m.Text)))
+                {
+                    <div class="message @(msg.IsUser ? "user" : "bot")">
+                        <div class="message-content">
+                            @((MarkupString)msg.Text.Replace("\n", "<br/>"))
+                        </div>
+                        <div class="message-time">@msg.Timestamp.ToString("HH:mm")</div>
+                    </div>
+                }
+                @if (_isTyping)
+                {
+                    <div class="message bot typing">
+                        <div class="message-content">
+                            <span class="dot"></span>
+                            <span class="dot"></span>
+                            <span class="dot"></span>
+                        </div>
+                    </div>
+                }
+            </div>
+            <div class="chat-input-area">
+                <button class="mic-btn @(_isListening ? "listening pulse" : "")" @onclick="StartListening" title="Dictar por voz">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                        <path d="M5 3a3 3 0 0 1 6 0v5a3 3 0 0 1-6 0z"/>
+                        <path d="M3.5 6.5A.5.5 0 0 1 4 7v1a4 4 0 0 0 8 0V7a.5.5 0 0 1 1 0v1a5 5 0 0 1-4.5 4.975V15h3a.5.5 0 0 1 0 1h-7a.5.5 0 0 1 0-1h3v-2.025A5 5 0 0 1 3 8V7a.5.5 0 0 1 .5-.5z"/>
+                    </svg>
+                </button>
+                <input type="text" @bind="_userInput" @bind:event="oninput" @onkeyup="HandleKeyUp" placeholder="@(_isListening ? "Escuchando..." : "Escribe un mensaje...")" />
+                <button class="send-btn" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(_userInput) || _isTyping || _isListening)">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M15.854.146a.5.5 0 0 1 .11.53l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.109zM6.736 10.1l2.31 3.637L14.282 1.5 6.736 10.1z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    }
+
+    <button class="chat-toggle-btn @(_isOpen ? "open" : "")" @onclick="ToggleChat">
+        @if (_isOpen)
+        {
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/></svg>
+        }
+        else
+        {
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8c0 3.866-3.582 7-8 7a9 9 0 0 1-2.347-.306c-.584.296-1.925.864-4.181 1.234-.2.032-.352-.176-.273-.362.354-.836.674-1.95.77-2.966C.744 11.37 0 9.76 0 8c0-3.866 3.582-7 8-7s8 3.134 8 7M5 8a1 1 0 1 0-2 0 1 1 0 0 0 2 0m4 0a1 1 0 1 0-2 0 1 1 0 0 0 2 0m3 1a1 1 0 1 0 0-2 1 1 0 0 0 0 2"/></svg>
+        }
+    </button>
+</div>
+
+@code {
+    private bool _isOpen = false;
+    private bool _isClosing = false;
+    private string _userInput = "";
+    private bool _isTyping = false;
+    private bool _isListening = false;
+    private DotNetObjectReference<ChatBot>? _objRef;
+
+    private List<ChatMessage> _messages = new()
+    {
+        new ChatMessage { Text = "¡Hola! Soy tu asistente de ElitePOS. ¿En qué puedo ayudarte hoy?", IsUser = false, Timestamp = DateTime.Now }
+    };
+
+    protected override void OnInitialized()
+    {
+        _objRef = DotNetObjectReference.Create(this);
+    }
+
+    private async Task ToggleChat()
+    {
+        if (_isOpen)
+        {
+            await CloseWithAnimation();
+        }
+        else
+        {
+            _isOpen = true;
+        }
+    }
+
+    private async Task CloseWithAnimation()
+    {
+        _isClosing = true;
+        StateHasChanged();
+        await Task.Delay(300); // Wait for CSS animation
+        _isOpen = false;
+        _isClosing = false;
+        StateHasChanged();
+    }
+
+    private async Task StartListening()
+    {
+        if (_isListening || _isTyping) return;
+        _isListening = true;
+        await JS.InvokeVoidAsync("startVoiceRecognition", _objRef);
+    }
+
+    [JSInvokable]
+    public async Task OnVoiceResult(string transcript)
+    {
+        _userInput = transcript;
+        StateHasChanged();
+        await SendMessage();
+    }
+
+    [JSInvokable]
+    public void OnVoiceError(string error)
+    {
+        _isListening = false;
+        StateHasChanged();
+    }
+
+    [JSInvokable]
+    public void OnVoiceEnd()
+    {
+        _isListening = false;
+        StateHasChanged();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(_userInput) || _isTyping) return;
+
+        var userMsg = _userInput;
+        _userInput = "";
+        
+        _messages.Add(new ChatMessage { Text = userMsg, IsUser = true, Timestamp = DateTime.Now });
+        _isTyping = true;
+        StateHasChanged();
+        await ScrollToBottom();
+
+        string response;
+        try
+        {
+            response = await AssistantService.ChatAsync(userMsg, _messages);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[CHAT ERROR] {ex.Message}");
+            response = "Vaya, parece que perdí la conexión un segundo. ¿Podrías repetirme eso?";
+        }
+        
+        _isTyping = false;
+        _messages.Add(new ChatMessage { Text = response, IsUser = false, Timestamp = DateTime.Now });
+        StateHasChanged();
+        await ScrollToBottom();
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task ScrollToBottom()
+    {
+        await JS.InvokeVoidAsync("eval", "setTimeout(() => { var el = document.getElementById('chat-messages'); if(el) el.scrollTo(0, el.scrollHeight); }, 10)");
+    }
+
+    private bool EsMensajeOculto(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+
+        string trimmed = text.Trim();
+        string upper = text.ToUpper();
+        
+        // Filtro Radical: Detectar mensajes técnicos, sistema o resultados de herramientas
+        bool esHerramienta = upper.Contains("\"ACCION\":") || upper.Contains("'ACCION':");
+        bool esSistema = upper.Contains("[SISTEMA]") || upper.Contains("RESULTADO DE HERRAMIENTA");
+        bool esEstructuraJson = text.Contains("```json") || trimmed.StartsWith("{");
+
+        if (esHerramienta || esSistema || esEstructuraJson) return true;
+
+        return false;
+    }
+
+    public void Dispose()
+    {
+        _objRef?.Dispose();
+    }
+}
+
+<style>
+    .chatbot-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 9999;
+    }
+
+    .chat-toggle-btn {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        border: none;
+        color: white;
+        cursor: pointer;
+        box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+        transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .chat-toggle-btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(79, 70, 229, 0.6);
+    }
+
+    .chat-toggle-btn.open {
+        background: #ef4444;
+        box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+        transform: rotate(180deg);
+    }
+
+    .chat-window {
+        position: absolute;
+        bottom: 80px;
+        right: 0;
+        width: 350px;
+        height: 500px;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        animation: chatAppear 0.3s ease-out forwards;
+    }
+
+    .chat-window-closing {
+        animation: chatDisappear 0.3s ease-in forwards !important;
+    }
+
+    @@keyframes chatAppear {
+        from { opacity: 0; transform: translateY(20px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    @@keyframes chatDisappear {
+        from { opacity: 1; transform: translateY(0) scale(1); }
+        to { opacity: 0; transform: translateY(40px) scale(0.95); }
+    }
+
+    .chat-header {
+        padding: 15px 20px;
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .header-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .bot-avatar {
+        width: 36px;
+        height: 36px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+    }
+
+    .chat-header h3 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+
+    .status-online {
+        font-size: 11px;
+        opacity: 0.9;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .status-online::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        background: #22c55e;
+        border-radius: 50%;
+        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+    }
+
+    .chat-messages {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        background: #fdfdfd;
+        scroll-behavior: smooth;
+    }
+
+    .message {
+        max-width: 85%;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .message.user {
+        align-self: flex-end;
+    }
+
+    .message.bot {
+        align-self: flex-start;
+    }
+
+    .message-content {
+        padding: 12px 16px;
+        border-radius: 18px;
+        font-size: 14px;
+        line-height: 1.5;
+        position: relative;
+    }
+
+    .message.user .message-content {
+        background: #4f46e5;
+        color: white;
+        border-bottom-right-radius: 4px;
+        box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+    }
+
+    .message.bot .message-content {
+        background: #f1f5f9;
+        color: #1e293b;
+        border-bottom-left-radius: 4px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .message-time {
+        font-size: 10px;
+        color: #94a3b8;
+        padding: 0 5px;
+    }
+
+    .message.user .message-time { align-self: flex-end; }
+
+    .chat-input-area {
+        padding: 15px;
+        background: white;
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .chat-input-area input {
+        flex: 1;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 10px 15px;
+        font-size: 14px;
+        outline: none;
+        transition: all 0.2s;
+        background: #f8fafc;
+    }
+
+    .chat-input-area input:focus {
+        border-color: #4f46e5;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+    }
+
+    .mic-btn {
+        background: #f1f5f9;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .mic-btn:hover {
+        background: #e2e8f0;
+        color: #4f46e5;
+    }
+
+    .mic-btn.listening {
+        background: #ef4444;
+        color: white;
+        border-color: #ef4444;
+    }
+
+    .pulse {
+        animation: pulse-animation 1.5s infinite;
+    }
+
+    @@keyframes pulse-animation {
+        0% { box-shadow: 0 0 0 0px rgba(239, 68, 68, 0.7); }
+        70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        100% { box-shadow: 0 0 0 0px rgba(239, 68, 68, 0); }
+    }
+
+    .send-btn {
+        background: #4f46e5;
+        color: white;
+        border: none;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .send-btn:hover:not(:disabled) { 
+        background: #4338ca; 
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(67, 56, 202, 0.3);
+    }
+
+    .send-btn:disabled { 
+        background: #94a3b8; 
+        cursor: not-allowed; 
+        transform: none !important;
+        box-shadow: none !important;
+    }
+
+    .typing .message-content {
+        display: flex;
+        gap: 4px;
+        padding: 12px 18px;
+        background: #f1f5f9;
+        width: fit-content;
+    }
+
+    .dot {
+        width: 6px;
+        height: 6px;
+        background: #64748b;
+        border-radius: 50%;
+        animation: typingDot 1.4s infinite ease-in-out;
+    }
+
+    .dot:nth-child(1) { animation-delay: -0.32s; }
+    .dot:nth-child(2) { animation-delay: -0.16s; }
+
+    @@keyframes typingDot {
+        0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+        40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Custom Scrollbar */
+    .chat-messages::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    .chat-messages::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb {
+        background: #e2e8f0;
+        border-radius: 10px;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb:hover {
+        background: #cbd5e1;
+    }
+</style>
+
+
+
+
+

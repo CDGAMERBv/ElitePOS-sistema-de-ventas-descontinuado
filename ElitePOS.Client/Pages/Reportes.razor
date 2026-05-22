@@ -1,0 +1,173 @@
+@page "/reportes"
+@using ElitePOS.Client.Services
+@using ElitePOS.Shared.Models
+@using ElitePOS.Client.Components
+@inject NavigationManager NavigationManager
+
+<div class="reportes-page" style="min-height: 100vh; background: #f8fafc; padding: 20px;">
+    <div style="width: 100%; margin: 0 auto; padding: 0 20px;">
+
+        <!-- ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ -->
+        <!-- HEADER: Título de la Página                                             -->
+        <!-- ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ -->
+        <div style="margin-bottom: 24px;">
+            <h1 style="font-size: 24px; font-weight: 700; color: #1a1a1a; margin: 0 0 8px 0;">
+                Reportes
+            </h1>
+            <p style="font-size: 13px; color: #6b7280; font-weight: 500; margin: 0;">
+                Accede a todos los reportes y análisis del sistema
+            </p>
+        </div>
+
+        <!-- ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ -->
+        <!-- GRID DE TARJETAS DE REPORTES                                            -->
+        <!-- ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ï¿½.ï¿½ -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px;">
+
+            <!-- Tarjeta: Ventas Generales -->
+            <div class="reporte-card" @onclick='() => NavigationManager.NavigateTo("/reporte-ventas-generales")'>
+                <div class="reporte-card-icon-wrapper" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
+                    <i class="bi bi-bar-chart-fill reporte-card-icon" style="color: #1e40af;"></i>
+                </div>
+                <h3 class="reporte-card-title">Ventas Generales</h3>
+                <p class="reporte-card-description">Resumen global de ventas y transacciones</p>
+            </div>
+
+            <!-- Tarjeta: Ventas Detalladas -->
+            <div class="reporte-card" @onclick='() => NavigationManager.NavigateTo("/reportes/ventas-detallado")'>
+                <div class="reporte-card-icon-wrapper" style="background: linear-gradient(135deg, #ccfbf1 0%, #99f6e4 100%);">
+                    <i class="bi bi-list-columns-reverse reporte-card-icon" style="color: #0f766e;"></i>
+                </div>
+                <h3 class="reporte-card-title">Ventas Detalladas</h3>
+                <p class="reporte-card-description">Desglose detallado por ProductoModel y categoría</p>
+            </div>
+
+            <!-- Tarjeta: Utilidades -->
+            <div class="reporte-card" @onclick='() => NavigationManager.NavigateTo("/reportes/utilidades")'>
+                <div class="reporte-card-icon-wrapper" style="background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);">
+                    <i class="bi bi-cash-coin reporte-card-icon" style="color: #16a34a;"></i>
+                </div>
+                <h3 class="reporte-card-title">Utilidades</h3>
+                <p class="reporte-card-description">Análisis de ganancias y costos</p>
+            </div>
+
+            <!-- Tarjeta: Stock -->
+            <div class="reporte-card" @onclick='() => NavigationManager.NavigateTo("/reporte-stock")'>
+                <div class="reporte-card-icon-wrapper" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                    <i class="bi bi-box-seam-fill reporte-card-icon" style="color: #d97706;"></i>
+                </div>
+                <h3 class="reporte-card-title">Stock</h3>
+                <p class="reporte-card-description">Control de inventario y existencias</p>
+            </div>
+
+            <!-- Tarjeta: Compras Detalladas -->
+            <div class="reporte-card" @onclick='() => NavigationManager.NavigateTo("/reportes/compras-detalladas")'>
+                <div class="reporte-card-icon-wrapper" style="background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);">
+                    <i class="bi bi-bag-fill reporte-card-icon" style="color: #7e22ce;"></i>
+                </div>
+                <h3 class="reporte-card-title">Compras Detalladas</h3>
+                <p class="reporte-card-description">Historial de compras y proveedores</p>
+            </div>
+
+            <!-- Tarjeta: Gastos -->
+            <div class="reporte-card" @onclick='() => NavigationManager.NavigateTo("/reporte-gastos")'>
+                <div class="reporte-card-icon-wrapper" style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);">
+                    <i class="bi bi-wallet-fill reporte-card-icon" style="color: #dc2626;"></i>
+                </div>
+                <h3 class="reporte-card-title">Gastos</h3>
+                <p class="reporte-card-description">Registro y control de gastos operativos</p>
+            </div>
+
+            <!-- Tarjeta: Auditoría -->
+            <div class="reporte-card" @onclick='() => NavigationManager.NavigateTo("/auditoria")'>
+                <div class="reporte-card-icon-wrapper" style="background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);">
+                    <i class="bi bi-shield-lock-fill reporte-card-icon" style="color: #4338ca;"></i>
+                </div>
+                <h3 class="reporte-card-title">Auditoría</h3>
+                <p class="reporte-card-description">Bitácora de cambios y accesos</p>
+            </div>
+
+            <!-- Tarjeta: Kardex Gerencial -->
+            <div class="reporte-card" @onclick='() => NavigationManager.NavigateTo("/reportes/kardex")'>
+                <div class="reporte-card-icon-wrapper" style="background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%);">
+                    <i class="bi bi-journal-text reporte-card-icon" style="color: #8b5cf6;"></i>
+                </div>
+                <h3 class="reporte-card-title">Kardex</h3>
+                <p class="reporte-card-description">Control detallado de movimientos de inventario</p>
+            </div>
+
+            <!-- Tarjeta: Registro de Ventas SUNAT 14.1 -->
+            <div class="reporte-card" @onclick='() => NavigationManager.NavigateTo("/reporte-sunat-141")'>
+                <div class="reporte-card-icon-wrapper" style="background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);">
+                    <i class="bi bi-file-earmark-spreadsheet reporte-card-icon" style="color: white;"></i>
+                </div>
+                <h3 class="reporte-card-title">SUNAT 14.1 (Contador)</h3>
+                <p class="reporte-card-description">Registro de ventas e ingresos para declaración</p>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<style>
+/* Estilos para las tarjetas de reportes (Clonado de Configuración) */
+.reporte-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid #f1f5f9;
+}
+
+.reporte-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1);
+    border-color: #e2e8f0;
+}
+
+.reporte-card-icon-wrapper {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    transition: transform 0.3s ease;
+}
+
+.reporte-card:hover .reporte-card-icon-wrapper {
+    transform: scale(1.05);
+}
+
+.reporte-card-icon {
+    font-size: 28px;
+}
+
+.reporte-card-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0 0 8px 0;
+}
+
+.reporte-card-description {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+    line-height: 1.5;
+}
+</style>
+
+@code {
+    // No se requiere lógica adicional
+}
+
+
+
+
+
+

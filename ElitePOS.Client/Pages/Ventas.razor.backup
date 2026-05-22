@@ -1,0 +1,871 @@
+@page "/ventas"
+@using ElitePOS.Models
+@using ElitePOS.Services
+@inject IInventarioService InventarioService
+@inject IVentasService VentasService
+@inject IClientesService ClientesService
+@inject ISesionService SesionService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="container-fluid" style="min-height: 100vh; background: #f8fafc; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; margin: 20px; width: calc(100% - 40px);">
+    <!-- Header Principal -->
+    <div style="background: #1e40af; padding: 12px 20px; color: white; display: flex; justify-content: space-between; align-items: center;">
+        <h1 style="font-size: 20px; font-weight: 600; margin: 0;">Punto de Venta</h1>
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <span style="font-size: 14px;">Usuario: @(SesionService.UsuarioActual?.Nombre ?? "Invitado")</span>
+            <span style="font-size: 14px;">@DateTime.Now.ToString("dd/MM/yyyy HH:mm")</span>
+        </div>
+    </div>
+    
+    <!-- Contenido Principal -->
+    <div style="flex: 1; display: flex; padding: 15px; gap: 15px;">
+        <!-- Panel Izquierdo -->
+        <div style="width: 450px; display: flex; flex-direction: column; gap: 15px;">
+            <!-- Cliente con Autocomplete -->
+            <fieldset style="background: white; border: 1px solid #d1d5db; border-radius: 8px; padding: 15px;">
+                <legend style="font-size: 14px; font-weight: 600; color: #374151;">Cliente</legend>
+                <div class="input-group">
+                    <span class="input-group-text border-end-0" style="background: white; border-right: none; padding: 8px 12px; height: 38px;">
+                        <i class="bi bi-person" style="color: #9ca3af; font-size: 16px;"></i>
+                    </span>
+                    <input type="text" 
+                           value="@busquedaCliente" 
+                           @oninput="@(e => BuscarCliente(e.Value?.ToString() ?? string.Empty))" 
+                           placeholder="Cliente general" 
+                           class="form-control border-start-0" 
+                           style="height: 38px; border-left: none;" />
+                </div>
+                
+                @if (mostrarDropdownClientes && clientesFiltrados.Any())
+                {
+                    <div style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #d1d5db; border-radius: 4px; max-height: 150px; overflow-y: auto; z-index: 2000; margin-top: 2px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                        @foreach (var clienteItem in clientesFiltrados.Take(5))
+                        {
+                            <div style="padding: 8px; cursor: pointer; border-bottom: 1px solid #f3f4f6; color: #000000;"
+                                 @onclick="() => SeleccionarCliente(clienteItem)">
+                                <div style="font-weight: 500; color: #000000; font-size: 12px;">@clienteItem.Nombre</div>
+                                <div style="font-size: 11px; color: #6b7280;">@clienteItem.DniRuc</div>
+                            </div>
+                        }
+                    </div>
+                }
+            </fieldset>
+            
+            <!-- Información del Comprobante -->
+            <fieldset style="background: white; border: 1px solid #d1d5db; border-radius: 8px; padding: 15px;">
+                <legend style="font-size: 14px; font-weight: 600; color: #374151;">Comprobante</legend>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <select @bind="tipoComprobante" class="form-control" style="height: 38px; font-size: 14px;">
+                        <option value="">Seleccionar...</option>
+                        <option value="Boleta">Boleta</option>
+                        <option value="Factura">Factura</option>
+                        <option value="Nota de Venta">Nota de Venta</option>
+                    </select>
+                    <input type="text" 
+                           @bind="numeroComprobante" 
+                           placeholder="N° Comprobante" 
+                           class="form-control" 
+                           style="height: 38px; font-size: 14px;" />
+                </div>
+                
+                <!-- IGV Opcional -->
+                <div style="display: flex; align-items: center; gap: 8px; padding: 8px 0;">
+                    <input type="checkbox" 
+                           @bind="incluirIGV" 
+                           style="width: 16px; height: 16px; cursor: pointer;" />
+                    <label style="font-size: 13px; color: #374151; cursor: pointer; margin: 0;">
+                        Incluir IGV (18%)
+                    </label>
+                </div>
+            </fieldset>
+            
+            <!-- Descuento Global -->
+            <fieldset style="background: white; border: 1px solid #d1d5db; border-radius: 8px; padding: 15px;">
+                <legend style="font-size: 14px; font-weight: 600; color: #374151;">Descuento Global</legend>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="number" 
+                           @bind="descuentoGlobal" 
+                           min="0" 
+                           max="100" 
+                           step="0.01"
+                           placeholder="0.00" 
+                           class="form-control" 
+                           style="height: 38px; font-size: 14px;" />
+                    <span style="font-size: 14px; color: #6b7280;">%</span>
+                </div>
+            </fieldset>
+            
+            <!-- Información Adicional -->
+            <fieldset style="background: white; border: 1px solid #d1d5db; border-radius: 8px; padding: 15px;">
+                <legend style="font-size: 14px; font-weight: 600; color: #374151;">Información Adicional</legend>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <!-- Placa -->
+                    <div>
+                        <label style="font-size: 11px; color: #6b7280; font-weight: 500;">Placa</label>
+                        <input type="text" @bind="placa" 
+                               style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;" />
+                    </div>
+                    
+                    <!-- Orden Compra -->
+                    <div>
+                        <label style="font-size: 11px; color: #6b7280; font-weight: 500;">O. Compra</label>
+                        <input type="text" @bind="ordenCompra" 
+                               style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;" />
+                    </div>
+                    
+                    <!-- Guia Remision -->
+                    <div>
+                        <label style="font-size: 11px; color: #6b7280; font-weight: 500;">G. Remisión</label>
+                        <input type="text" @bind="guiaRemision" 
+                               style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;" />
+                    </div>
+                    
+                    <!-- Condición Pago -->
+                    <div>
+                        <label style="font-size: 11px; color: #6b7280; font-weight: 500;">Cond. Pago</label>
+                        <select @bind="condicionPagoId" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px;">
+                            <option value="1">Contado</option>
+                            <option value="2">Crédito</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Observaciones -->
+                <div style="margin-top: 10px;">
+                    <label style="font-size: 11px; color: #6b7280; font-weight: 500;">Observaciones</label>
+                    <textarea @bind="observaciones" 
+                              rows="2" 
+                              style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; resize: vertical;"></textarea>
+                </div>
+            </fieldset>
+        </div>
+        
+        <!-- Panel Derecho -->
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 15px;">
+            <!-- Carrito de Compras -->
+            <fieldset style="background: white; border: 1px solid #d1d5db; border-radius: 8px; padding: 15px; flex: 1; display: flex; flex-direction: column;">
+                <legend style="font-size: 14px; font-weight: 600; color: #374151;">Carrito de Compras</legend>
+                
+                <!-- Lista de Productos -->
+                <div style="flex: 1; overflow-y: auto; max-height: 400px; margin-bottom: 10px;">
+                    @if (carrito.Any())
+                    {
+                        @foreach (var item in carrito)
+                        {
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #f3f4f6; border-radius: 4px; margin-bottom: 4px; background: #f9fafb;">
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 600; font-size: 14px; color: #111827; margin-bottom: 4px;">@item.Nombre</div>
+                                    <div style="font-size: 11px; color: #6b7280; line-height: 1.4;">
+                                        <div>Almacen: @item.Almacen</div>
+                                        <div>Precio Unit. +IGV: S/ @item.PrecioUnitarioIGV.ToString("N2")</div>
+                                        <div>Descuento: S/ @item.Descuento.ToString("N2")</div>
+                                        <div style="font-weight: 500; color: #059669;">Total Item: S/ @item.TotalItem.ToString("N2")</div>
+                                    </div>
+                                </div>
+                                
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <input type="number" 
+                                           @bind="item.Cantidad" 
+                                           @bind:event="oninput"
+                                           min="1" 
+                                           style="width: 60px; padding: 4px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 12px; text-align: center;" />
+                                    <button @onclick="() => EliminarDelCarrito(item)" 
+                                            style="padding: 4px 8px; background: #ef4444; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer;">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div style="text-align: center; padding: 40px; color: #9ca3af;">
+                            <i class="bi bi-cart" style="font-size: 48px; display: block; margin-bottom: 12px; opacity: 0.3;"></i>
+                            <p style="font-size: 14px; margin: 0;">Carrito vacío</p>
+                        </div>
+                    }
+                </div>
+                
+                <!-- Resumen de totales -->
+                <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 16px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 14px; color: #6b7280;">Subtotal:</span>
+                        <span style="font-size: 14px; font-weight: 500;">S/ @subtotal.ToString("N2")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 14px; color: #6b7280;">IGV (18%):</span>
+                        <span style="font-size: 14px; font-weight: 500;">S/ @igv.ToString("N2")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 14px; color: #6b7280;">Descuento:</span>
+                        <span style="font-size: 14px; font-weight: 500;">S/ @descuentoTotal.ToString("N2")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                        <span style="font-size: 16px; font-weight: 600; color: #111827;">TOTAL:</span>
+                        <span style="font-size: 18px; font-weight: 700; color: #059669;">S/ @total.ToString("N2")</span>
+                    </div>
+                </div>
+            </fieldset>
+        </div>
+    </div>
+</div>
+
+<!-- Barra Fija Inferior - Footer Oscuro -->
+<div style="position: fixed; bottom: 0; width: 100%; z-index: 1000; padding: 10px; background: linear-gradient(135deg, #1f2937 0%, #111827 100%); border-top: 2px solid #1e40af; color: white; box-shadow: 0 -4px 6px rgba(0,0,0,0.1);">
+    <div style="display: flex; align-items: center; justify-content: space-between; max-width: 1400px; margin: 0 auto;">
+        
+        <!-- Extremo Izquierdo: Contador de Items -->
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <span style="font-size: 14px; color: rgba(255,255,255,0.9); font-weight: 500;">Items:</span>
+            <span style="background: rgba(255,255,255,0.2); padding: 4px 8px; border-radius: 6px; font-size: 16px; font-weight: 600;">@carrito.Count</span>
+        </div>
+        
+        <!-- Centro: Buscador de Productos -->
+        <div style="flex: 1; display: flex; align-items: center; justify-content: center;">
+            <div style="position: relative; width: 300px;">
+                <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: rgba(255,255,255,0.7); z-index: 10;">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input type="text" 
+                       value="@busquedaProducto" 
+                       @oninput="@(e => BuscarProducto(e.Value?.ToString() ?? string.Empty))" 
+                       placeholder="Buscar productos..." 
+                       style="width: 100%; padding: 10px 10px 10px 40px; border: 1px solid rgba(255,255,255,0.3); border-radius: 25px; background: rgba(255,255,255,0.1); color: white; font-size: 14px; outline: none;" />
+            </div>
+        </div>
+        
+        <!-- Extremo Derecho: Botones de Acción -->
+        <div style="display: flex; gap: 12px;">
+            <button @onclick="FinalizarVenta" 
+                    style="padding: 12px 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(16,185,129,0.3);">
+                <i class="bi bi-cash-coin me-2"></i>
+                PROCESAR
+            </button>
+            <button @onclick="CancelarVenta" 
+                    style="padding: 12px 20px; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(239,68,68,0.3);">
+                <i class="bi bi-x-circle me-2"></i>
+                CANCELAR
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    // Variables del formulario
+                                    style="padding: 4px 8px; background: #1e40af; color: white; border: none; border-radius: 4px; font-size: 10px; cursor: pointer;">
+                                <i class="bi bi-pencil"></i> Editar
+                            </button>
+                        </div>
+                        
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <label style="font-size: 11px; color: #6b7280; font-weight: 500;">Proforma:</label>
+                            <input type="checkbox" @bind="esProforma" style="width: 16px; height: 16px;" />
+                            <span style="font-size: 12px; color: #6b7280;">Marcar como proforma</span>
+                        </div>
+                        
+                        @if (!string.IsNullOrWhiteSpace(observaciones))
+                        {
+                            <div style="margin-top: 8px; padding: 8px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 4px; font-size: 11px; color: #374151;">
+                                @observaciones
+                            </div>
+                        }
+                    </div>
+        
+        <!-- Panel Derecho - Carrito Detallado -->
+        <div style="flex: 1; display: flex; flex-direction: column;">
+            <div style="background: white; border: 1px solid #d1d5db; border-radius: 8px; padding: 20px; flex: 1; display: flex; flex-direction: column;">
+                <h3 style="font-size: 16px; font-weight: 600; color: #374151; margin: 0 0 20px 0;">Detalle de Productos</h3>
+                
+                <!-- Carrito de Productos -->
+                <div style="flex: 1; overflow-y: auto;">
+                    @if (carrito.Any())
+                    {
+                        @foreach (var item in carrito)
+                        {
+                            <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; background: #fafafa;">
+                                <div style="display: flex; gap: 12px;">
+                                    <!-- Placeholder de imagen -->
+                                    <div style="width: 60px; height: 60px; background: #f3f4f6; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+                                        <i class="bi bi-box" style="font-size: 24px; color: #9ca3af;"></i>
+                                    </div>
+                                    
+                                    <!-- Información del producto -->
+                                    <div style="flex: 1;">
+                                        <div style="font-weight: 600; font-size: 14px; color: #111827; margin-bottom: 4px;">@item.Nombre</div>
+                                        <div style="font-size: 11px; color: #6b7280; line-height: 1.4;">
+                                            <div>Almacen: @item.Almacen</div>
+                                            <div>Precio Unit. +IGV: S/ @item.PrecioUnitarioIGV.ToString("N2")</div>
+                                            <div>Descuento: S/ @item.Descuento.ToString("N2")</div>
+                                            <div style="font-weight: 500; color: #059669;">Total Item: S/ @item.TotalItem.ToString("N2")</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Controles de cantidad -->
+                                    <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                                        <div style="display: flex; align-items: center; gap: 4px;">
+                                            <button @onclick="() => CambiarCantidad(item, -1)" 
+                                                    style="width: 24px; height: 24px; background: #1e40af; color: white; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                                                <i class="bi bi-dash" style="font-size: 12px;"></i>
+                                            </button>
+                                            <input type="number" @bind="item.Cantidad" min="1" max="999" 
+                                                   style="width: 50px; padding: 4px; border: 1px solid #d1d5db; border-radius: 4px; text-align: center; font-size: 12px;" />
+                                            <button @onclick="() => CambiarCantidad(item, 1)" 
+                                                    style="width: 24px; height: 24px; background: #1e40af; color: white; border: none; border-radius: 4px; cursor: pointer; display: flex; align-items: center; justify-content: center;">
+                                                <i class="bi bi-plus" style="font-size: 12px;"></i>
+                                            </button>
+                                        </div>
+                                        <button @onclick="() => EliminarDelCarrito(item)" 
+                                                style="padding: 4px 8px; background: #ef4444; color: white; border: none; border-radius: 4px; font-size: 10px; cursor: pointer;">
+                                            ELIMINAR
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 60px 20px; color: #9ca3af; height: 100%; width: 100%; margin: 0 auto; display: block;">
+                            <i class="bi bi-cart" style="font-size: 48px; margin-bottom: 16px;"></i>
+                            <div style="font-size: 16px;">No hay productos en el carrito</div>
+                            <div style="font-size: 12px; margin-top: 8px;">Busque y agregue productos para comenzar</div>
+                        </div>
+                    }
+                </div>
+                
+                <!-- Resumen de totales -->
+                <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 16px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 14px; color: #6b7280;">Subtotal:</span>
+                        <span style="font-size: 14px; font-weight: 500;">S/ @subtotal.ToString("N2")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 14px; color: #6b7280;">IGV (18%):</span>
+                        <span style="font-size: 14px; font-weight: 500;">S/ @igv.ToString("N2")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 14px; color: #6b7280;">Descuento:</span>
+                        <span style="font-size: 14px; font-weight: 500;">S/ @descuentoTotal.ToString("N2")</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                        <span style="font-size: 16px; font-weight: 600; color: #111827;">TOTAL:</span>
+                        <span style="font-size: 18px; font-weight: 700; color: #059669;">S/ @total.ToString("N2")</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+<!-- Modal de Observaciones -->
+@if (mostrarModalObservaciones)
+{
+    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 3000; display: flex; align-items: center; justify-content: center;">
+        <div style="background: white; border-radius: 8px; padding: 24px; max-width: 500px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="font-size: 16px; font-weight: 600; color: #111827; margin: 0;">Editar Observaciones</h3>
+                <button @onclick="CerrarModalObservaciones" 
+                        style="background: none; border: none; color: #6b7280; cursor: pointer; font-size: 20px; padding: 0;">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+            
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 12px; color: #374151; font-weight: 500; display: block; margin-bottom: 8px;">
+                    Observaciones de la venta:
+                </label>
+                <textarea @bind="observacionesTemp" 
+                          placeholder="" 
+                          rows="6" 
+                          style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; font-size: 13px; resize: vertical; font-family: 'Inter', sans-serif;">
+                </textarea>
+                <div style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+                    @observacionesTemp.Length caracteres
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                <button @onclick="CerrarModalObservaciones" 
+                        style="padding: 8px 16px; background: #f3f4f6; color: #374151; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;">
+                    Cancelar
+                </button>
+                <button @onclick="GuardarObservaciones" 
+                        style="padding: 8px 16px; background: #1e40af; color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer;">
+                    Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Dropdown Otros -->
+@if (mostrarMenuOtros)
+{
+    <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.1); z-index: 2500;" @onclick="CerrarMenuOtros"></div>
+    <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 8px; padding: 16px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 2501; min-width: 200px;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+            <button @onclick="() => { CerrarMenuOtros(); NuevaVenta(); }" 
+                    style="padding: 8px 12px; background: none; border: none; text-align: left; cursor: pointer; font-size: 12px; color: #374151; border-radius: 4px;">
+                <i class="bi bi-plus-circle" style="margin-right: 8px;"></i> Nueva Venta
+            </button>
+            <button @onclick="() => { CerrarMenuOtros(); VerHistorial(); }" 
+                    style="padding: 8px 12px; background: none; border: none; text-align: left; cursor: pointer; font-size: 12px; color: #374151; border-radius: 4px;">
+                <i class="bi bi-clock-history" style="margin-right: 8px;"></i> Historial
+            </button>
+            <button @onclick="() => { CerrarMenuOtros(); Imprimir(); }" 
+                    style="padding: 8px 12px; background: none; border: none; text-align: left; cursor: pointer; font-size: 12px; color: #374151; border-radius: 4px;">
+                <i class="bi bi-printer" style="margin-right: 8px;"></i> Imprimir
+            </button>
+            <button @onclick="() => { CerrarMenuOtros(); ExportarPDF(); }" 
+                    style="padding: 8px 12px; background: none; border: none; text-align: left; cursor: pointer; font-size: 12px; color: #374151; border-radius: 4px;">
+                <i class="bi bi-file-pdf" style="margin-right: 8px;"></i> Exportar PDF
+            </button>
+            <hr style="margin: 8px 0; border: none; border-top: 1px solid #e5e7eb;" />
+            <button @onclick="() => { CerrarMenuOtros(); Configuracion(); }" 
+                    style="padding: 8px 12px; background: none; border: none; text-align: left; cursor: pointer; font-size: 12px; color: #374151; border-radius: 4px;">
+                <i class="bi bi-gear" style="margin-right: 8px;"></i> Configuración
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    // Variables locales
+    private List<ProductoModel> listaProductos = new List<ProductoModel>();
+    private List<ClienteModel> listaClientes = new List<ClienteModel>();
+    
+    // Variables de filtrado
+    private List<ProductoModel> productosFiltrados = new List<ProductoModel>();
+    private List<ClienteModel> clientesFiltrados = new List<ClienteModel>();
+    
+    // Variables de UI
+    private string busquedaCliente = "";
+    private string busquedaProducto = "";
+    private bool mostrarDropdownClientes = false;
+    private bool mostrarDropdownProductos = false;
+    private bool mostrarModalObservaciones = false;
+    private bool mostrarMenuOtros = false;
+    private bool mostrarInformacionAdicional = false;
+    
+    // Variables del comprobante
+    private string tipoComprobante = "";
+    private string numeroComprobante = "";
+    private bool incluirIGV = true;
+    private decimal descuentoGlobal = 0;
+    private string tipoOperacion = "VENTA INTERNA";
+    private DateTime fechaEmision = DateTime.Now;
+    private DateTime fechaVcto = DateTime.Now.AddDays(30);
+    
+    // Nuevas propiedades del modelo
+    private string placa = "";
+    private string ordenCompra = "";
+    private string guiaRemision = "";
+    private string observaciones = "";
+    private string observacionesTemp = "";
+    private int condicionPagoId = 1;
+    private bool esProforma = false;
+    
+    // Datos para dropdowns
+    private List<string> seriesDisponibles = new List<string> { "BB01", "BB02", "BB03", "FA01", "FA02" };
+    private List<CondicionPago> condicionesPago = new List<CondicionPago>();
+    
+    // Carrito
+    private List<CarritoItem> carrito = new List<CarritoItem>();
+    private ClienteModel clienteSeleccionado = new ClienteModel();
+    
+    // Propiedades calculadas
+    private decimal subtotal => carrito.Sum(item => item.PrecioUnitarioIGV * item.Cantidad);
+    private decimal igv => incluirIGV ? subtotal * 0.18m : 0;
+    private decimal descuentoTotal => (subtotal + igv) * (descuentoGlobal / 100);
+    private decimal total => subtotal + igv - descuentoTotal;
+
+    // Carga inicial
+    protected override async Task OnInitializedAsync()
+    {
+        // Verificar si el usuario está autenticado
+        await SesionService.CargarSesionDesdeStorage();
+        if (SesionService.UsuarioActual == null)
+        {
+            // Redirigir a login si no hay sesión activa
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+        
+        await CargarDatosIniciales();
+    }
+
+    private async Task CargarDatosIniciales()
+    {
+        try
+        {
+            // Cargar productos
+            var productosServicio = await InventarioService.ObtenerProductos();
+            listaProductos = productosServicio.ToList();
+            
+            // Si no hay productos, crear datos de prueba
+            if (!listaProductos.Any())
+            {
+                listaProductos = new List<ProductoModel>
+                {
+                    new ProductoModel { Id = "1", Nombre = "ARENA DE RIO", CodigoBarras = "123456", Stock = 50, PrecioVenta = 25.50m, Categoria = "Construccion" },
+                    new ProductoModel { Id = "2", Nombre = "CEMENTO PORTLAND", CodigoBarras = "789012", Stock = 100, PrecioVenta = 35.80m, Categoria = "Construccion" },
+                    new ProductoModel { Id = "3", Nombre = "LADRILLO KK 18H", CodigoBarras = "345678", Stock = 200, PrecioVenta = 2.50m, Categoria = "Construccion" },
+                    new ProductoModel { Id = "4", Nombre = "CLAVOS 3\"", CodigoBarras = "901234", Stock = 500, PrecioVenta = 0.15m, Categoria = "Ferreteria" },
+                    new ProductoModel { Id = "5", Nombre = "ALAMBRE #8", CodigoBarras = "567890", Stock = 100, PrecioVenta = 8.75m, Categoria = "Ferreteria" }
+                };
+            }
+            
+            // Cargar clientes
+            var clientesServicio = await ClientesService.ObtenerClientes();
+            listaClientes = clientesServicio.ToList();
+            
+            // Si no hay clientes, crear datos de prueba
+            if (!listaClientes.Any())
+            {
+                listaClientes = new List<ClienteModel>
+                {
+                    new ClienteModel { Id = "1", Nombre = "CONSTRUCTORA ANDINA SAC", DniRuc = "20123456789", Telefono = "987654321", Direccion = "Av. Principal 123" },
+                    new ClienteModel { Id = "2", Nombre = "JUAN PEREZ GARCIA", DniRuc = "12345678", Telefono = "912345678", Direccion = "Calle Secundaria 456" },
+                    new ClienteModel { Id = "3", Nombre = "INVERSIONES DEL NORTE", DniRuc = "20567890123", Telefono = "998877665", Direccion = "Jiron Central 789" }
+                };
+            }
+            
+            // Cargar condiciones de pago
+            condicionesPago = new List<CondicionPago>
+            {
+                new CondicionPago { Id = 1, Nombre = "Contado" },
+                new CondicionPago { Id = 2, Nombre = "Crédito 15 días" },
+                new CondicionPago { Id = 3, Nombre = "Crédito 30 días" },
+                new CondicionPago { Id = 4, Nombre = "Crédito 60 días" },
+                new CondicionPago { Id = 5, Nombre = "Crédito 90 días" }
+            };
+            
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error cargando datos: {ex.Message}");
+        }
+    }
+
+    // Búsqueda de clientes con sincronización inmediata
+    private async Task BuscarCliente(string texto)
+    {
+        busquedaCliente = texto ?? string.Empty;
+        
+        if (string.IsNullOrWhiteSpace(busquedaCliente))
+        {
+            clientesFiltrados.Clear();
+            mostrarDropdownClientes = false;
+        }
+        else
+        {
+            clientesFiltrados = listaClientes
+                .Where(c => c.Nombre.ToLower().Contains(busquedaCliente.ToLower()) ||
+                            c.DniRuc.Contains(busquedaCliente))
+                .ToList();
+
+            mostrarDropdownClientes = clientesFiltrados.Any();
+        }
+        
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // Búsqueda de productos con sincronización inmediata
+    private async Task BuscarProducto(string texto)
+    {
+        busquedaProducto = texto ?? string.Empty;
+        
+        if (string.IsNullOrWhiteSpace(busquedaProducto))
+        {
+            productosFiltrados.Clear();
+            mostrarDropdownProductos = false;
+        }
+        else
+        {
+            productosFiltrados = listaProductos
+                .Where(p => p.Nombre.ToLower().Contains(busquedaProducto.ToLower()) ||
+                            p.CodigoBarras.Contains(busquedaProducto))
+                .ToList();
+
+            mostrarDropdownProductos = productosFiltrados.Any();
+        }
+        
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // Selección de cliente
+    private void SeleccionarCliente(ClienteModel cliente)
+    {
+        clienteSeleccionado = cliente;
+        busquedaCliente = cliente.DniRuc;
+        mostrarDropdownClientes = false;
+        StateHasChanged();
+    }
+
+    // Agregar al carrito
+    private void AgregarAlCarrito(ProductoModel producto)
+    {
+        var itemExistente = carrito.FirstOrDefault(c => c.ProductoId == producto.Id);
+        if (itemExistente != null)
+        {
+            itemExistente.Cantidad++;
+        }
+        else
+        {
+            carrito.Add(new CarritoItem
+            {
+                ProductoId = producto.Id,
+                Nombre = producto.Nombre,
+                PrecioUnitarioIGV = producto.PrecioVenta,
+                Cantidad = 1,
+                Almacen = "ALMACEN PRINCIPAL",
+                Descuento = 0
+            });
+        }
+
+        busquedaProducto = "";
+        mostrarDropdownProductos = false;
+        StateHasChanged();
+    }
+
+    // Cambiar cantidad
+    private void CambiarCantidad(CarritoItem item, int cambio)
+    {
+        item.Cantidad += cambio;
+        if (item.Cantidad <= 0)
+        {
+            EliminarDelCarrito(item);
+        }
+        else
+        {
+            // Recalcular total del item
+            item.TotalItem = item.PrecioUnitarioIGV * item.Cantidad - item.Descuento;
+            StateHasChanged();
+        }
+    }
+
+    // Eliminar del carrito
+    private void EliminarDelCarrito(CarritoItem item)
+    {
+        carrito.Remove(item);
+        StateHasChanged();
+    }
+
+    // Finalizar venta con descuento global
+    private async Task FinalizarVenta()
+    {
+        if (!carrito.Any())
+        {
+            await JSRuntime.InvokeVoidAsync("alert", "El carrito está vacío");
+            return;
+        }
+
+        try
+        {
+            // Calcular total con descuento global aplicado
+            var subtotalCalculado = carrito.Sum(item => item.PrecioUnitarioIGV * item.Cantidad);
+            var igvCalculado = subtotalCalculado * 0.18m;
+            var descuentoCalculado = (subtotalCalculado + igvCalculado) * (descuentoGlobal / 100);
+            var totalCalculado = subtotalCalculado + igvCalculado - descuentoCalculado;
+
+            var venta = new VentaModel
+            {
+                Id = Guid.NewGuid().ToString(),
+                FechaHora = DateTime.Now,
+                ClienteId = clienteSeleccionado?.Id ?? "cliente-general",
+                Cliente = clienteSeleccionado?.Nombre ?? "Cliente General",
+                Subtotal = subtotalCalculado,
+                SubtotalGravada = subtotalCalculado,
+                IGV = igvCalculado,
+                Total = totalCalculado,
+                // Nuevas propiedades del modelo
+                Placa = placa,
+                OrdenCompra = ordenCompra,
+                GuiaRemision = guiaRemision,
+                Observaciones = observaciones,
+                CondicionPagoId = condicionPagoId,
+                EsProforma = esProforma,
+                Items = carrito.Select(c => new VentaItemModel
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    ProductoId = c.ProductoId,
+                    NombreProducto = c.Nombre,
+                    Cantidad = c.Cantidad,
+                    PrecioUnitario = c.PrecioUnitarioIGV,
+                    PrecioVenta = c.PrecioUnitarioIGV,
+                    Subtotal = c.PrecioUnitarioIGV * c.Cantidad,
+                    PrecioTotal = c.TotalItem
+                }).ToList()
+            };
+
+            await VentasService.RegistrarVenta(venta);
+            
+            // Restar stock de productos vendidos
+            await RestarStock();
+            
+            // Limpiar carrito y campos
+            carrito.Clear();
+            clienteSeleccionado = new ClienteModel();
+            busquedaCliente = "";
+            placa = "";
+            ordenCompra = "";
+            guiaRemision = "";
+            observaciones = "";
+            condicionPagoId = 1;
+            esProforma = false;
+            descuentoGlobal = 0;
+            StateHasChanged();
+            
+            await JSRuntime.InvokeVoidAsync("alert", "Venta procesada correctamente");
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("alert", $"Error al procesar venta: {ex.Message}");
+        }
+    }
+
+    // Restar stock de productos vendidos
+    private async Task RestarStock()
+    {
+        try
+        {
+            foreach (var item in carrito)
+            {
+                var producto = listaProductos.FirstOrDefault(p => p.Id == item.ProductoId);
+                if (producto != null && producto.Stock >= item.Cantidad)
+                {
+                    var nuevoStock = producto.Stock - item.Cantidad;
+                    await InventarioService.ActualizarStock(producto.Id, nuevoStock);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al restar stock: {ex.Message}");
+        }
+    }
+
+    private void ActualizarCantidad(CarritoItem item)
+    {
+        // Recalcular total del item
+        item.TotalItem = item.PrecioUnitarioIGV * item.Cantidad - item.Descuento;
+        StateHasChanged();
+    }
+
+    // Cancelar venta
+    private void CancelarVenta()
+    {
+        carrito.Clear();
+        clienteSeleccionado = new ClienteModel();
+        busquedaCliente = "";
+        busquedaProducto = "";
+        placa = "";
+        ordenCompra = "";
+        guiaRemision = "";
+        observaciones = "";
+        condicionPagoId = 1;
+        esProforma = false;
+        descuentoGlobal = 0;
+        StateHasChanged();
+    }
+
+    // Funciones de botones
+    private void ToggleInformacionAdicional()
+    {
+        mostrarInformacionAdicional = !mostrarInformacionAdicional;
+        StateHasChanged();
+    }
+
+    private void AbrirModalObservaciones()
+    {
+        observacionesTemp = observaciones;
+        mostrarModalObservaciones = true;
+        StateHasChanged();
+    }
+
+    private void CerrarModalObservaciones()
+    {
+        mostrarModalObservaciones = false;
+        observacionesTemp = "";
+        StateHasChanged();
+    }
+
+    private void GuardarObservaciones()
+    {
+        observaciones = observacionesTemp;
+        mostrarModalObservaciones = false;
+        StateHasChanged();
+    }
+
+    private void MostrarMenuOtros()
+    {
+        mostrarMenuOtros = true;
+        StateHasChanged();
+    }
+
+    private void CerrarMenuOtros()
+    {
+        mostrarMenuOtros = false;
+        StateHasChanged();
+    }
+
+    // Acciones del menú Otros
+    private void NuevaVenta()
+    {
+        CancelarVenta();
+        // Limpiar todos los campos
+        placa = "";
+        ordenCompra = "";
+        guiaRemision = "";
+        observaciones = "";
+        condicionPagoId = 1;
+        esProforma = false;
+        descuentoGlobal = 0;
+        StateHasChanged();
+    }
+
+    private void VerHistorial()
+    {
+        // Navegar a página de historial
+        Console.WriteLine("Navegando a historial de ventas...");
+    }
+
+    private void Imprimir()
+    {
+        // Lógica de impresión
+        Console.WriteLine("Imprimiendo comprobante...");
+    }
+
+    private void ExportarPDF()
+    {
+        // Lógica de exportación PDF
+        Console.WriteLine("Exportando a PDF...");
+    }
+
+    private void Configuracion()
+    {
+        // Navegar a configuración
+        Console.WriteLine("Abriendo configuración...");
+    }
+
+    public class CarritoItem
+    {
+        public string ProductoId { get; set; } = string.Empty;
+        public string Nombre { get; set; } = string.Empty;
+        public decimal PrecioUnitarioIGV { get; set; }
+        public int Cantidad { get; set; }
+        public string Almacen { get; set; } = "ALMACEN PRINCIPAL";
+    }
+}
+        public decimal Descuento { get; set; }
+        public decimal TotalItem { get; set; }
+    }
+
+    public class CondicionPago
+    {
+        public int Id { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+    }
+}

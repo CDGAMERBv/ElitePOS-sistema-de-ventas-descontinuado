@@ -1,0 +1,271 @@
+@page "/empresa"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Client.Services
+@using ElitePOS.Services
+@using Microsoft.AspNetCore.Components.Forms
+@inject IConfiguracionEmpresaService ConfiguracionService
+@inject INotificationService NotificationService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+
+<style>
+    /* ═══════════════════════════════════════════════════════════ */
+    /* 🏥 SURGICAL RECONSTRUCTION: EMPRESA PREMIUM v2.6          */
+    /* Scale Control (950px) & Fiscal Integration                 */
+    /* ═══════════════════════════════════════════════════════════ */
+    .e-page { min-height: 100vh; background: #f8fafc; padding: 40px; }
+    .e-container { max-width: 950px; margin: 0 auto; }
+    
+    .e-card { background: white; border-radius: 20px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; margin-bottom: 24px; }
+    
+    .e-section-title { font-size: 14px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 24px; display: flex; align-items: center; gap: 15px; }
+    .e-section-title::after { content: ""; flex: 1; height: 1.5px; background: #f1f5f9; }
+
+    .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    .full-width { grid-column: span 2; }
+    
+    .form-label-elite { display: block; font-size: 11px; font-weight: 800; color: #64748b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-control-elite { width: 100%; padding: 12px 16px; border: 1.5px solid #f1f5f9; border-radius: 12px; font-size: 14px; transition: all 0.2s; background: #fcfdfe; }
+    .form-control-elite:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08); background: white; }
+
+    /* Logo Upload Styles */
+    .logo-box { width: 140px; height: 140px; border: 2px dashed #e2e8f0; border-radius: 20px; display: flex; align-items: center; justify-content: center; background: #f8fafc; overflow: hidden; position: relative; transition: all 0.2s; }
+    .logo-box:hover { border-color: #3b82f6; background: #f0f7ff; }
+    .logo-img { max-width: 90%; max-height: 90%; object-fit: contain; }
+    
+    /* Buttons */
+    .btn-volver-premium { padding: 10px 18px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; color: #64748b; font-weight: 800; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .btn-volver-premium:hover { background: #f8fafc; color: #1e293b; transform: translateX(-4px); }
+
+    .btn-guardar-premium { padding: 14px 40px; background: #1e293b; color: white; border: none; border-radius: 14px; font-weight: 800; cursor: pointer; transition: all 0.3s; display: flex; align-items: center; gap: 10px; font-size: 14px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+    .btn-guardar-premium:hover:not(:disabled) { background: #0f172a; transform: translateY(-3px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+    .btn-guardar-premium:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    @@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+<div class="e-page">
+    @if (cargando)
+    {
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60vh;">
+            <div style="width: 50px; height: 50px; border: 4px solid #f1f5f9; border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <p style="margin-top: 24px; color: #94a3b8; font-weight: 700; letter-spacing: 0.5px;">SINCRONIZANDO PERFIL...</p>
+        </div>
+    }
+    else
+    {
+        <div class="e-container">
+            <!-- HEADER -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+                <div style="display: flex; gap: 24px; align-items: center;">
+                    <button class="btn-volver-premium" @onclick='() => Navigation.NavigateTo("/configuracion")'>
+                        <i class="bi bi-arrow-left"></i> VOLVER
+                    </button>
+                    <div>
+                        <h1 style="font-size: 28px; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -1px;">Sintonía Corporativa</h1>
+                        <p style="color: #64748b; font-size: 14px; font-weight: 500; margin-top: 2px;">Gestión de identidad fiscal y parámetros globales</p>
+                    </div>
+                </div>
+            </div>
+
+            <EditForm Model="@configuracion" OnValidSubmit="GuardarCambios">
+                
+                <!-- SECCIÓN 1: IDENTIDAD E INFO GENERAL -->
+                <div class="e-card">
+                    <h2 class="e-section-title"><i class="bi bi-building"></i> Identidad e Info General</h2>
+                    
+                    <div style="display: flex; gap: 40px; align-items: center; margin-bottom: 32px; background: #fcfdfe; padding: 24px; border-radius: 20px; border: 1px solid #f1f5f9;">
+                        <div class="logo-box">
+                            @if (!string.IsNullOrEmpty(configuracion.logoUrl)) { <img src="@configuracion.logoUrl" class="logo-img" /> }
+                            else { <i class="bi bi-image" style="font-size: 40px; color: #cbd5e1; opacity: 0.5;"></i> }
+                            
+                            @if (!string.IsNullOrEmpty(configuracion.logoUrl))
+                            {
+                                <button type="button" @onclick="() => configuracion.logoUrl = null" style="position: absolute; bottom: 8px; right: 8px; background: #ef4444; color: white; border: none; border-radius: 8px; width: 28px; height: 28px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"><i class="bi bi-x-lg" style="font-size: 12px;"></i></button>
+                            }
+                        </div>
+                        <div style="flex: 1;">
+                            <label class="form-label-elite">Logotipo Institucional</label>
+                            <label for="logo-upload" style="display: inline-flex; align-items: center; gap: 10px; padding: 12px 24px; background: #1e293b; color: white; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 13px; transition: all 0.2s;">
+                                <i class="bi bi-cloud-arrow-up-fill"></i> SELECCIONAR IMAGEN
+                            </label>
+                            <InputFile id="logo-upload" OnChange="OnLogoSeleccionado" accept="image/*" style="display: none;" />
+                            <p style="font-size: 11px; color: #94a3b8; font-weight: 500; margin-top: 12px; line-height: 1.4;">Formatos: PNG o JPG recomendados.<br/>Tamaño máximo: 1MB.</p>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div>
+                            <label class="form-label-elite">RUC / Identificación Fiscal</label>
+                            <InputText @bind-Value="configuracion.ruc" class="form-control-elite" placeholder="Ej. 20XXXXXXXXX" />
+                        </div>
+                        <div>
+                            <label class="form-label-elite">Nombre Comercial</label>
+                            <InputText @bind-Value="configuracion.nombreComercial" class="form-control-elite" placeholder="Elite POS - Store" />
+                        </div>
+                        <div class="full-width">
+                            <label class="form-label-elite">Razón Social *</label>
+                            <InputText @bind-Value="configuracion.razonSocial" class="form-control-elite" placeholder="Corporación Elite S.A.C." />
+                        </div>
+                        <div class="full-width">
+                            <label class="form-label-elite">Dirección Principal</label>
+                            <InputText @bind-Value="configuracion.direccion" class="form-control-elite" placeholder="Av. Central 123..." />
+                        </div>
+                        <div>
+                            <label class="form-label-elite">Departamento</label>
+                            <InputText @bind-Value="configuracion.departamento" class="form-control-elite" placeholder="Ej. Lima" />
+                        </div>
+                        <div>
+                            <label class="form-label-elite">Provincia</label>
+                            <InputText @bind-Value="configuracion.provincia" class="form-control-elite" placeholder="Ej. Lima" />
+                        </div>
+                        <div>
+                            <label class="form-label-elite">Distrito</label>
+                            <InputText @bind-Value="configuracion.distrito" class="form-control-elite" placeholder="Ej. Miraflores" />
+                        </div>
+                        <div>
+                            <label class="form-label-elite">Teléfono / WhatsApp</label>
+                            <InputText @bind-Value="configuracion.telefono" class="form-control-elite" placeholder="+51 900 000 000" />
+                        </div>
+                        <div class="full-width">
+                            <label class="form-label-elite">Correo Electrónico Corporativo</label>
+                            <InputText @bind-Value="configuracion.correo" class="form-control-elite" placeholder="administracion@empresa.com" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 2: OPERACIÓN Y FACTURACIÓN -->
+                <div class="e-card">
+                    <h2 class="e-section-title"><i class="bi bi-gear-wide-connected"></i> Parámetros de Operación</h2>
+                    <div class="form-grid">
+                        <div>
+                            <label class="form-label-elite">Moneda Base</label>
+                            <InputSelect @bind-Value="configuracion.moneda" class="form-control-elite" style="appearance: auto;" @onchange="ActualizarSimbolo">
+                                <option value="S/">Soles (S/)</option>
+                                <option value="$">Dólares ($)</option>
+                                <option value="€">Euros (€)</option>
+                            </InputSelect>
+                        </div>
+                        <div>
+                            <label class="form-label-elite">IGV / Tax por Defecto</label>
+                            <InputSelect @bind-Value="configuracion.afectacionIgvDefecto" class="form-control-elite" style="appearance: auto;">
+                                <option value="10">Gravado - Operación Onerosa</option>
+                                <option value="20">Exonerado - Operación Onerosa</option>
+                                <option value="30">Inafecto - Operación Onerosa</option>
+                            </InputSelect>
+                        </div>
+                        <div class="full-width">
+                            <label class="form-label-elite">Identidad de Cliente Anónimo</label>
+                            <InputText @bind-Value="configuracion.clienteAnonimoDefecto" class="form-control-elite" placeholder="PÚBLICO EN GENERAL" />
+                        </div>
+                        <div class="full-width" style="display: flex; align-items: center; gap: 16px; background: #fffdf5; padding: 16px; border-radius: 16px; border: 1px solid #fef3c7;">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" @bind="configuracion.permitirVentaSinStock" id="swStock" style="width: 44px; height: 22px; cursor: pointer;">
+                            </div>
+                            <label for="swStock" style="font-size: 13px; font-weight: 700; color: #92400e; cursor: pointer;">PERMITIR VENTAS SIN STOCK (Venta en Negativo)</label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECCIÓN 3: DOCUMENTACIÓN Y BANCOS (Integración Huérfana) -->
+                <div class="e-card">
+                    <h2 class="e-section-title"><i class="bi bi-bank"></i> Documentación y Bancos</h2>
+                    <div class="form-grid">
+                        <div class="full-width">
+                            <label class="form-label-elite">Cuentas Bancarias (Visible en Comprobantes)</label>
+                            <InputTextArea @bind-Value="configuracion.cuentasBancarias" class="form-control-elite" rows="3" placeholder="BCP Soles: XXX-XXXX-XXX..." />
+                        </div>
+                        <div>
+                            <label class="form-label-elite">Resolución de Autorización SUNAT</label>
+                            <InputText @bind-Value="configuracion.resolucionAutorizacion" class="form-control-elite" placeholder="Nro de resolución" />
+                        </div>
+                        <div>
+                            <label class="form-label-elite">URL de Consulta Ciudadana</label>
+                            <InputText @bind-Value="configuracion.urlConsulta" class="form-control-elite" placeholder="https://miempresa.com/v_comprobante" />
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 16px; justify-content: flex-end; margin: 40px 0 80px 0;">
+                    <button type="button" @onclick="Volver" style="padding: 14px 32px; background: white; border: 1px solid #e2e8f0; border-radius: 14px; color: #64748b; font-weight: 800; cursor: pointer; font-size: 14px;">DESCARTAR</button>
+                    <button type="submit" disabled="@guardando" class="btn-guardar-premium">
+                        @if (guardando) { <div style="width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite;"></div> }
+                        else { <i class="bi bi-shield-check-fill"></i> }
+                        <span>@(guardando ? "SINCRONIZANDO..." : "GUARDAR CAMBIOS")</span>
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    }
+</div>
+
+@code {
+    private ConfiguracionEmpresaModel configuracion = new();
+    private bool cargando = true;
+    private bool guardando = false;
+
+    protected override async Task OnInitializedAsync() => await CargarConfiguracion();
+
+    private async Task CargarConfiguracion()
+    {
+        try 
+        { 
+            cargando = true; 
+            configuracion = await ConfiguracionService.ObtenerConfiguracion(forceRefresh: true) ?? new();
+        }
+        catch { await NotificationService.ShowError("No se pudo cargar la configuración empresarial"); }
+        finally { cargando = false; }
+    }
+
+    private async Task GuardarCambios()
+    {
+        if (string.IsNullOrWhiteSpace(configuracion.razonSocial) || string.IsNullOrWhiteSpace(configuracion.nombreComercial))
+        {
+            await NotificationService.ShowWarning("Los campos marcados con (*) son obligatorios");
+            return;
+        }
+
+        try
+        {
+            guardando = true;
+            var exito = await ConfiguracionService.GuardarConfiguracion(configuracion);
+            if (exito)
+            {
+                await NotificationService.ShowSuccess("Perfil corporativo sincronizado ✨");
+                await Task.Delay(1000);
+                Volver();
+            }
+            else { await NotificationService.ShowError("Error al persistir cambios en Firestore"); }
+        }
+        catch (Exception ex) { await NotificationService.ShowError("Fallo interno: " + ex.Message); }
+        finally { guardando = false; }
+    }
+
+    private void ActualizarSimbolo()
+    {
+        configuracion.simboloMoneda = configuracion.moneda;
+        StateHasChanged();
+    }
+
+    private async Task OnLogoSeleccionado(InputFileChangeEventArgs e)
+    {
+        var archivo = e.File;
+        // Límite de 1MB para logos corporativos
+        if (archivo == null || archivo.Size > 1024 * 1024) 
+        { 
+            await NotificationService.ShowWarning("El logo no debe exceder 1MB"); 
+            return; 
+        }
+
+        try
+        {
+            using var stream = archivo.OpenReadStream(1024 * 1024);
+            using var ms = new MemoryStream();
+            await stream.CopyToAsync(ms);
+            configuracion.logoUrl = $"data:{archivo.ContentType};base64,{Convert.ToBase64String(ms.ToArray())}";
+        }
+        catch { await NotificationService.ShowError("Falla al procesar la imagen del logotipo"); }
+    }
+
+    private void Volver() => Navigation.NavigateTo("/configuracion");
+}

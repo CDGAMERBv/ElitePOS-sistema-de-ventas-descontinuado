@@ -1,0 +1,253 @@
+@page "/plan"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Client.Services
+@using ElitePOS.Client.Components
+@using ElitePOS.Services
+@inject IPlanService PlanService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+
+<style>
+    /* ═══════════════════════════════════════════════════════════ */
+    /* 🏥 SURGICAL RECONSTRUCTION: PLAN SaaS v2.6 (FASE 2 FINAL)    */
+    /* Scale Control (1000px) & Payment Gateway Redirection       */
+    /* ═══════════════════════════════════════════════════════════ */
+    .p-page { min-height: 100vh; background: #f8fafc; padding: 40px; }
+    .p-container { max-width: 1000px; margin: 0 auto; }
+    
+    .p-card { background: white; border-radius: 24px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; margin-bottom: 24px; }
+    
+    /* Header Gradient */
+    .p-header-gradient { background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%); border-radius: 24px; padding: 40px; margin-bottom: 32px; color: white; box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4); position: relative; overflow: hidden; }
+    .p-header-gradient::before { content: ""; position: absolute; top: -50%; right: -20%; width: 300px; height: 300px; background: rgba(255,255,255,0.1); border-radius: 50%; filter: blur(50px); }
+
+    /* Progress Bars */
+    .progress-bar-elite { width: 100%; height: 12px; background: #f1f5f9; border-radius: 10px; overflow: hidden; margin-top: 10px; }
+    .progress-fill { height: 100%; transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+    /* Buttons */
+    .btn-volver-premium { padding: 10px 20px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; color: #64748b; font-weight: 800; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .btn-volver-premium:hover { background: #f8fafc; color: #1e293b; transform: translateX(-4px); }
+
+    .btn-upgrade { background: #1e293b; color: white; border-radius: 14px; font-weight: 800; padding: 14px 28px; border: none; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.3s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .btn-upgrade:hover { background: #0f172a; transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+
+    /* Plans Grid */
+    .plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-top: 40px; }
+    .plan-card-elite { background: white; border-radius: 24px; padding: 32px; border: 2.5px solid transparent; transition: all 0.3s ease; display: flex; flex-direction: column; position: relative; }
+    .plan-card-elite:hover { transform: translateY(-10px); box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+    
+    .plan-price { font-size: 32px; font-weight: 900; color: #0f172a; margin: 16px 0; }
+    .plan-feature { display: flex; align-items: center; gap: 12px; font-size: 13.5px; color: #475569; margin-bottom: 12px; font-weight: 500; }
+    .plan-feature i { color: #10b981; font-size: 16px; }
+
+    /* Animations */
+    @@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+</style>
+
+<div class="p-page">
+    <div class="p-container">
+        <!-- HEADER -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px;">
+            <div style="display: flex; gap: 24px; align-items: center;">
+                <button class="btn-volver-premium" @onclick="Volver">
+                    <i class="bi bi-arrow-left"></i> VOLVER
+                </button>
+                <div>
+                    <h1 style="font-size: 28px; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -1px;">Gestión de Suscripción</h1>
+                    <p style="color: #64748b; font-size: 14px; font-weight: 500; margin-top: 2px;">Control de licencias y escalabilidad empresarial</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- CURRENT STATUS GRADIENT -->
+        <div class="p-header-gradient">
+            <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                <div>
+                    <span style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; opacity: 0.8;">PLAN ACTUALMENTE ACTIVO</span>
+                    <h2 style="font-size: 44px; font-weight: 900; margin: 10px 0 0 0; letter-spacing: -2px;">@plan.nombrePlan</h2>
+                </div>
+                <div style="text-align: right;">
+                    <span style="font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; opacity: 0.8;">FECHA DE VENCIMIENTO</span>
+                    <p style="font-size: 24px; font-weight: 800; margin: 10px 0 0 0;">@plan.fechaVencimiento.ToString("dd MMMM, yyyy")</p>
+                </div>
+            </div>
+            
+            <div style="margin-top: 32px; padding: 20px; background: rgba(255,255,255,0.12); border-radius: 16px; border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(8px);">
+                @{
+                    var dias = (plan.fechaVencimiento - DateTime.Now).Days;
+                    var activo = dias > 0;
+                }
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    @if(activo) { <i class="bi bi-patch-check-fill" style="font-size: 24px;"></i> }
+                    else { <i class="bi bi-exclamation-triangle-fill" style="font-size: 24px; color: #ffedd5;"></i> }
+                    <span style="font-weight: 700; font-size: 15px;">
+                        @(activo ? $"Licencia válida por {dias} días naturales adicionales." : "Tu periodo de suscripción ha finalizado. Actualiza para continuar.")
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- LIMITS & PROGRESS -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px;">
+            <div class="p-card" style="margin-bottom: 0;">
+                <h3 style="font-size: 13px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 2px solid #f1f5f9; padding-bottom: 15px; margin-bottom: 24px;">Límites Operativos</h3>
+                
+                <!-- Productos -->
+                <div style="margin-bottom: 24px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #475569;">
+                        <span>CATÁLOGO PRODUCTOS</span>
+                        <span>@plan.productosUsados / @plan.limiteProductos</span>
+                    </div>
+                    <div class="progress-bar-elite">
+                        <div class="progress-fill" style="width: @ObtenerPorcentaje(plan.productosUsados, plan.limiteProductos)%; background: @ObtenerColorBarra(plan.productosUsados, plan.limiteProductos);"></div>
+                    </div>
+                </div>
+
+                <!-- Ventas -->
+                <div style="margin-bottom: 0;">
+                    <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 800; color: #475569;">
+                        <span>TRANSACCIONES VENTAS</span>
+                        <span>@plan.ventasUsadas / @plan.limiteVentas</span>
+                    </div>
+                    <div class="progress-bar-elite">
+                        <div class="progress-fill" style="width: @ObtenerPorcentaje(plan.ventasUsadas, plan.limiteVentas)%; background: @ObtenerColorBarra(plan.ventasUsadas, plan.limiteVentas);"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SUPPORT & UPDATE BANNER -->
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+                <div class="p-card" style="flex: 1; margin-bottom: 0; background: #1e293b; color: white; border: none;">
+                    <h3 style="font-size: 13px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 12px;">SOPORTE TÉCNICO ELITE</h3>
+                    <p style="font-size: 14px; color: #cbd5e1; line-height: 1.6;">Atención prioritaria para resolver incidentes críticos y dudas sobre funciones avanzadas.</p>
+                    <button class="btn-upgrade" style="background: white; color: #1e293b; margin-top: 16px; padding: 12px 24px;" @onclick="AbrirModalSoporte">
+                        <i class="bi bi-headset"></i> CONTACTAR SOPORTE
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- UPGRADE BANNER FULL WIDTH -->
+        <div style="background: #eff6ff; border-radius: 24px; padding: 32px; border: 1px solid #dbeafe; display: flex; align-items: center; justify-content: space-between; margin-bottom: 60px;">
+            <div>
+                <h3 style="font-size: 20px; font-weight: 900; color: #1e40af; margin: 0;">¿Necesitas mayor potencia para tu negocio?</h3>
+                <p style="color: #60a5fa; font-weight: 600; margin: 4px 0 0 0;">Explora nuestros planes diseñados para cada fase de crecimiento.</p>
+            </div>
+            <button class="btn-upgrade" style="background: #2563eb;" @onclick="MostrarPlanes">
+                VER TODOS LOS PLANES <i class="bi bi-chevron-right"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- MODAL DE PLANES DISPONIBLES (SaaS Style)                                 -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+@if (mostrarModalPlanes)
+{
+    <div style="position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(12px); z-index: 2000; padding: 40px; overflow-y: auto; display: flex; align-items: flex-start; justify-content: center; animation: fadeIn 0.3s;">
+        <div style="max-width: 1200px; width: 100%; animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);">
+            
+            <div style="text-align: center; margin-bottom: 48px;">
+                <h2 style="font-size: 48px; font-weight: 900; color: #ffffff; letter-spacing: -2px; margin-bottom: 12px;">Precios Justos y Escalables</h2>
+                <p style="font-size: 18px; color: #e2e8f0; font-weight: 500;">Escoge el motor que impulsará el crecimiento de tu empresa.</p>
+                <button @onclick="CerrarModalPlanes" style="margin-top: 24px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 8px 20px; border-radius: 12px; cursor: pointer; font-weight: 700;">Hacerlo luego</button>
+            </div>
+
+            <div class="plans-grid">
+                <!-- FREE -->
+                <div class="plan-card-elite">
+                    <span style="font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px;">ESENCIA</span>
+                    <h3 style="font-size: 24px; font-weight: 900; color: #1e293b; margin: 4px 0 0 0;">Freemium</h3>
+                    <div class="plan-price">S/ 0.00</div>
+                    <div style="flex: 1;">
+                        <div class="plan-feature"><i class="bi bi-check-circle-fill"></i> 1 Usuario Principal</div>
+                        <div class="plan-feature"><i class="bi bi-check-circle-fill"></i> 50 Productos Catálogo</div>
+                        <div class="plan-feature"><i class="bi bi-dash-circle" style="color: #cbd5e1;"></i> Sin Facturación SUNAT</div>
+                    </div>
+                    <button class="btn-upgrade" style="width: 100%; background: #f1f5f9; color: #64748b; margin-top: 32px; box-shadow: none;" @onclick="RedirigirPago">CAMBIAR PLAN</button>
+                </div>
+
+                <!-- EMPRENDE -->
+                <div class="plan-card-elite" style="border-color: #10b981;">
+                    <div style="position: absolute; top: -14px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 4px 16px; border-radius: 20px; font-size: 11px; font-weight: 900;">MÁS POPULAR</div>
+                    <span style="font-size: 11px; font-weight: 900; color: #10b981; text-transform: uppercase; letter-spacing: 2px;">CRECIMIENTO</span>
+                    <h3 style="font-size: 24px; font-weight: 900; color: #1e293b; margin: 4px 0 0 0;">Elite Emprende</h3>
+                    <div class="plan-price">S/ 50.00 <span style="font-size: 14px; color: #94a3b8;">/mes</span></div>
+                    <div style="flex: 1;">
+                        <div class="plan-feature"><i class="bi bi-check-circle-fill"></i> Facturación SUNAT</div>
+                        <div class="plan-feature"><i class="bi bi-check-circle-fill"></i> 3 Usuarios Acceso</div>
+                        <div class="plan-feature"><i class="bi bi-check-circle-fill"></i> Productos Ilimitados</div>
+                    </div>
+                    <button class="btn-upgrade" style="width: 100%; background: #10b981; margin-top: 32px;" @onclick="RedirigirPago">UPGRADE AHORA</button>
+                </div>
+
+                <!-- PRO -->
+                <div class="plan-card-elite">
+                    <span style="font-size: 11px; font-weight: 900; color: #3b82f6; text-transform: uppercase; letter-spacing: 2px;">CORPORATIVO</span>
+                    <h3 style="font-size: 24px; font-weight: 900; color: #1e293b; margin: 4px 0 0 0;">Professional</h3>
+                    <div class="plan-price">S/ 90.00 <span style="font-size: 14px; color: #94a3b8;">/mes</span></div>
+                    <div style="flex: 1;">
+                        <div class="plan-feature"><i class="bi bi-check-circle-fill"></i> Gestión Multi-almacén</div>
+                        <div class="plan-feature"><i class="bi bi-check-circle-fill"></i> Bot WhatsApp (PDF)</div>
+                        <div class="plan-feature"><i class="bi bi-check-circle-fill"></i> Cuentas x Cobrar</div>
+                    </div>
+                    <button class="btn-upgrade" style="width: 100%; background: #3b82f6; margin-top: 32px;" @onclick="RedirigirPago">UPGRADE AHORA</button>
+                </div>
+
+                <!-- INFINITY -->
+                <div class="plan-card-elite" style="background: #1e293b; color: white; border-color: #f59e0b;">
+                    <span style="font-size: 11px; font-weight: 900; color: #f59e0b; text-transform: uppercase; letter-spacing: 2px;">POTENCIA TOTAL</span>
+                    <h3 style="font-size: 24px; font-weight: 900; color: white; margin: 4px 0 0 0;">Elite Infinity</h3>
+                    <div class="plan-price" style="color: #fdd835;">S/ 150.00 <span style="font-size: 14px; color: #94a3b8;">/mes</span></div>
+                    <div style="flex: 1;">
+                        <div class="plan-feature" style="color: #e2e8f0;"><i class="bi bi-check-circle-fill" style="color: #f59e0b;"></i> Usuarios Ilimitados</div>
+                        <div class="plan-feature" style="color: #e2e8f0;"><i class="bi bi-check-circle-fill" style="color: #f59e0b;"></i> Multi-Empresa</div>
+                        <div class="plan-feature" style="color: #e2e8f0;"><i class="bi bi-check-circle-fill" style="color: #f59e0b;"></i> IA Gemini Integrada</div>
+                    </div>
+                    <button class="btn-upgrade" style="width: 100%; background: #f59e0b; color: #1e293b; margin-top: 32px;" @onclick="RedirigirPago">CONTACTAR VENTAS</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<ModalSoporte Visible="@mostrarModalSoporte" OnCerrar="@(() => { mostrarModalSoporte = false; StateHasChanged(); })" />
+
+@code {
+    private PlanModel plan = new();
+    private bool mostrarModalPlanes = false;
+    private bool mostrarModalSoporte = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        plan = await PlanService.ObtenerPlanActual();
+    }
+
+    private double ObtenerPorcentaje(int usado, int limite)
+    {
+        if (limite <= 0) return 0;
+        return Math.Min(((double)usado / limite) * 100, 100);
+    }
+
+    private string ObtenerColorBarra(int usado, int limite)
+    {
+        var percent = ObtenerPorcentaje(usado, limite);
+        if (percent >= 90) return "linear-gradient(90deg, #ef4444 0%, #dc2626 100%)";
+        if (percent >= 70) return "linear-gradient(90deg, #f59e0b 0%, #d97706 100%)";
+        return "linear-gradient(90deg, #10b981 0%, #059669 100%)";
+    }
+
+    private async Task RedirigirPago()
+    {
+        // 🚀 REDIRECCIÓN EXTERNA: Portal de planes ElitePOS
+        await JSRuntime.InvokeVoidAsync("window.open", "https://tupaginaweb.com/planes", "_blank");
+    }
+
+    private void MostrarPlanes() { mostrarModalPlanes = true; StateHasChanged(); }
+    private void CerrarModalPlanes() { mostrarModalPlanes = false; StateHasChanged(); }
+    private void AbrirModalSoporte() { mostrarModalSoporte = true; StateHasChanged(); }
+    private void Volver() => Navigation.NavigateTo("/configuracion");
+}

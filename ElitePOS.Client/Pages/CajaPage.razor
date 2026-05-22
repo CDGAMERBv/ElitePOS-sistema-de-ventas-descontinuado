@@ -1,0 +1,171 @@
+@page "/caja"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Client.Services
+@using ElitePOS.Services
+@using System.ComponentModel.DataAnnotations
+@inject ICajaService CajaService
+@inject ISesionService SesionService
+@inject NavigationManager Navigation
+@inject IGastosService GastosService
+@inject INotificationService NotificationService
+@inject GestionStateService GestionState
+
+<style>
+    .caja-page { font-family: 'Inter', sans-serif; min-height: 100vh; background: #f8fafc; padding: 24px; }
+    .caja-card { background: white; border-radius: 16px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+    .kpi-card { background: white; border-radius: 12px; padding: 20px; border: 1px solid #e2e8f0; display: flex; align-items: center; gap: 16px; }
+    .caja-label { font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 8px; }
+    .caja-input { width: 100%; padding: 16px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 24px; font-weight: 800; text-align: center; outline: none; transition: border-color 0.2s; }
+    .caja-input:focus { border-color: #6366f1; }
+</style>
+
+<div class="caja-page">
+    <div style="max-width: 1000px; margin: 0 auto;">
+        
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px;">
+            <div>
+                <h1 style="font-size: 28px; font-weight: 800; color: #1e293b; margin: 0;">Control de Caja</h1>
+                <p style="color: #64748b; margin: 4px 0 0 0;">Apertura y cierre diario</p>
+            </div>
+            <button class="btn btn-outline-secondary" @onclick='() => Navigation.NavigateTo("/home")'><i class="bi bi-arrow-left"></i> Volver</button>
+        </div>
+
+        @if (cargando)
+        {
+            <div style="text-align: center; padding: 100px;">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p style="margin-top: 16px; color: #64748b; font-weight: 600;">Consultando estado de caja...</p>
+            </div>
+        }
+        else if (cajaAbierta == null)
+        {
+            <div class="caja-card" style="max-width: 500px; margin: 0 auto;">
+                <div style="text-align: center; margin-bottom: 32px;">
+                    <div style="width: 64px; height: 64px; background: #eff6ff; color: #3b82f6; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px; margin: 0 auto 16px;"><i class="bi bi-unlock-fill"></i></div>
+                    <h2 style="font-size: 20px; font-weight: 700;">Abrir Nueva Caja</h2>
+                </div>
+
+                <EditForm Model="@_aperturaForm" OnValidSubmit="AbrirCaja">
+                    <DataAnnotationsValidator />
+                    <div class="mb-4">
+                        <label class="caja-label">Monto para apertura (S/)</label>
+                        <InputNumber @bind-Value="_aperturaForm.monto" class="caja-input" placeholder="0.00" />
+                        <ValidationMessage For="@(() => _aperturaForm.monto)" />
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg w-100 py-3" style="border-radius: 12px; font-weight: 700;" disabled="@procesando">
+                        @if (procesando) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                        <span>ABRIR CAJA</span>
+                    </button>
+                </EditForm>
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-success d-flex align-items-center mb-4" style="border-radius: 12px; padding: 20px;">
+                <i class="bi bi-check-circle-fill me-3" style="font-size: 24px;"></i>
+                <div>
+                    <div style="font-weight: 800;">CAJA ABIERTA</div>
+                    <div style="font-size: 14px;">Iniciada el @cajaAbierta.fecha.ToString("dd/MM/yyyy HH:mm") por @cajaAbierta.nombreUsuario</div>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-bottom: 32px;">
+                <div class="kpi-card">
+                    <div style="width: 48px; height: 48px; border-radius: 10px; background: #f0fdf4; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 24px;"><i class="bi bi-cash"></i></div>
+                    <div><p class="caja-label" style="margin:0;">Apertura</p><p style="font-size: 20px; font-weight: 800; margin:0;">S/ @cajaAbierta.monto.ToString("N2")</p></div>
+                </div>
+                <div class="kpi-card">
+                    <div style="width: 48px; height: 48px; border-radius: 10px; background: #eff6ff; color: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 24px;"><i class="bi bi-graph-up-arrow"></i></div>
+                    <div><p class="caja-label" style="margin:0;">Ingresos</p><p style="font-size: 20px; font-weight: 800; margin:0;">S/ @ventasEfectivo.ToString("N2")</p></div>
+                </div>
+                <div class="kpi-card">
+                    <div style="width: 48px; height: 48px; border-radius: 10px; background: #fef2f2; color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 24px;"><i class="bi bi-graph-down-arrow"></i></div>
+                    <div><p class="caja-label" style="margin:0;">Egresos</p><p style="font-size: 20px; font-weight: 800; margin:0;">S/ @gastosCaja.ToString("N2")</p></div>
+                </div>
+            </div>
+
+            <div class="caja-card">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 32px; border-bottom: 1px solid #f1f5f9; padding-bottom: 24px;">
+                    <div>
+                        <label class="caja-label">Total esperado en efectivo</label>
+                        <h2 style="font-size: 42px; font-weight: 900; color: #1e293b; margin: 0;">S/ @((cajaAbierta.monto + ventasEfectivo - gastosCaja).ToString("N2"))</h2>
+                    </div>
+                    <button class="btn btn-light" @onclick="RefrescarKPIs"><i class="bi bi-arrow-clockwise"></i> Actualizar</button>
+                </div>
+
+                <div style="display: flex; gap: 16px;">
+                    <button class="btn btn-outline-danger btn-lg flex-fill py-3" style="font-weight: 700; border-radius: 12px;" @onclick="RegistrarEgresoManual">REGISTRAR GASTO</button>
+                    <button class="btn btn-dark btn-lg flex-fill py-3" style="font-weight: 700; border-radius: 12px;" @onclick="ConfirmarCierre">CERRAR CAJA</button>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private bool cargando = true;
+    private bool procesando = false;
+    private MovimientoCajaModel? cajaAbierta;
+    private decimal ventasEfectivo = 0;
+    private decimal gastosCaja = 0;
+    
+    private AperturaFormModel _aperturaForm = new();
+    private class AperturaFormModel { 
+        [Range(0, 1000000)] public decimal monto { get; set; } 
+    }
+
+    protected override async Task OnInitializedAsync() => await CargarEstadoCaja();
+
+    private async Task CargarEstadoCaja()
+    {
+        try {
+            cargando = true;
+            cajaAbierta = await CajaService.ObtenerCajaActual();
+            if (cajaAbierta != null) await RefrescarKPIs();
+        } finally {
+            cargando = false;
+        }
+    }
+
+    private async Task RefrescarKPIs()
+    {
+        ventasEfectivo = await CajaService.CalcularEfectivoEnCaja();
+        gastosCaja = await CajaService.CalcularGastosEnCaja();
+        StateHasChanged();
+    }
+
+    private async Task AbrirCaja()
+    {
+        try {
+            procesando = true;
+            var usuario = SesionService.UsuarioActual;
+            var res = await CajaService.AbrirCaja(_aperturaForm.monto, usuario?.usuarioId ?? "admin", usuario?.nombre ?? "Admin");
+            if (res) {
+                await NotificationService.ShowSuccess("Caja abierta");
+                await CargarEstadoCaja();
+            }
+        } finally {
+            procesando = false;
+        }
+    }
+
+    private async Task ConfirmarCierre()
+    {
+        if (procesando) return;
+        try {
+            procesando = true;
+            var esperado = cajaAbierta!.monto + ventasEfectivo - gastosCaja;
+            var usuario = SesionService.UsuarioActual;
+            var res = await CajaService.CerrarCaja(esperado, usuario?.usuarioId ?? "admin", usuario?.nombre ?? "Admin", "Cierre del sistema");
+            if (res) {
+                await NotificationService.ShowSuccess("Caja cerrada correctamente");
+                Navigation.NavigateTo("/home");
+            }
+        } finally {
+            procesando = false;
+        }
+    }
+
+    private void RegistrarEgresoManual() => Navigation.NavigateTo("/reporte-gastos");
+}

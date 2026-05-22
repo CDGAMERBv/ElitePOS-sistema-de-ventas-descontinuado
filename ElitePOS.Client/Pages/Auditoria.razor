@@ -1,0 +1,168 @@
+﻿@page "/auditoria"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Services
+@using ElitePOS.Client.Services
+@using System.Text.Json
+@inject ElitePOS.Services.IAuditoriaService AuditoriaService
+@inject ElitePOS.Services.IUsuariosService UsuariosService
+@inject ElitePOS.Services.ISesionService SesionService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@inject ElitePOS.Client.Services.INotificationService NotificationService
+
+<style>
+    .card-elite { background: white; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #f1f5f9; display: flex; align-items: center; gap: 16px; }
+    .filter-label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+    .filter-input, .filter-select { width: 100%; padding: 10px 14px; border: 1px solid #e5e7eb; border-radius: 10px; font-size: 14px; background: #f8fafc; }
+    .badge-status { padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .badge-blue { background: #dbeafe; color: #1e40af; }
+    .badge-yellow { background: #fef3c7; color: #92400e; }
+    .badge-red { background: #fee2e2; color: #991b1b; }
+    .badge-green { background: #dcfce7; color: #166534; }
+</style>
+
+<div style="min-height: 100vh; background: #f8fafc; padding: 24px;">
+    <div style="max-width: 1200px; margin: 0 auto;">
+        
+        <div style="margin-bottom: 32px;">
+            <button @onclick='() => NavigationManager.NavigateTo("/reportes")' class="btn btn-sm btn-outline-secondary mb-3">
+                <i class="bi bi-arrow-left"></i> Volver
+            </button>
+            <h1 style="font-size: 28px; font-weight: 800; color: #1e293b; margin: 0;">Auditoría del Sistema</h1>
+            <p style="color: #64748b; margin: 4px 0 0 0;">Control de actividades y seguridad</p>
+        </div>
+
+        @if (_busquedaRealizada)
+        {
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 32px;">
+                <div class="card-elite">
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: #eff6ff; color: #3b82f6; display: flex; align-items: center; justify-content: center; font-size: 24px;"><i class="bi bi-person-check"></i></div>
+                    <div><p style="font-size: 11px; font-weight: 700; color: #64748b; margin: 0;">ACCESOS</p><p style="font-size: 20px; font-weight: 800; margin: 0;">@totalAccesos</p></div>
+                </div>
+                <div class="card-elite">
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: #fffbeb; color: #f59e0b; display: flex; align-items: center; justify-content: center; font-size: 24px;"><i class="bi bi-pencil-square"></i></div>
+                    <div><p style="font-size: 11px; font-weight: 700; color: #64748b; margin: 0;">CAMBIOS</p><p style="font-size: 20px; font-weight: 800; margin: 0;">@totalModificaciones</p></div>
+                </div>
+                <div class="card-elite">
+                    <div style="width: 48px; height: 48px; border-radius: 12px; background: #fef2f2; color: #ef4444; display: flex; align-items: center; justify-content: center; font-size: 24px;"><i class="bi bi-shield-x"></i></div>
+                    <div><p style="font-size: 11px; font-weight: 700; color: #64748b; margin: 0;">ANULACIONES</p><p style="font-size: 20px; font-weight: 800; margin: 0;">@totalAnulaciones</p></div>
+                </div>
+            </div>
+        }
+
+        <div style="background: white; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); margin-bottom: 24px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 20px; align-items: flex-end;">
+                <div><label class="filter-label">Desde</label><input type="date" class="filter-input" @bind="fechaDesde" /></div>
+                <div><label class="filter-label">Hasta</label><input type="date" class="filter-input" @bind="fechaHasta" /></div>
+                <div>
+                    <label class="filter-label">Usuario</label>
+                    <select class="filter-select" @bind="usuarioFiltro">
+                        <option value="">-- Todos --</option>
+                        @foreach (var user in listaUsuarios) { <option value="@user.nombreCompleto">@user.nombreCompleto</option> }
+                    </select>
+                </div>
+                <div>
+                    <label class="filter-label">Módulo</label>
+                    <select class="filter-select" @bind="moduloFiltro">
+                        <option value="">-- Todos --</option>
+                        <option value="Autenticación">Autenticación</option>
+                        <option value="Ventas">Ventas</option>
+                        <option value="Inventario">Inventario</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn btn-dark flex-fill" @onclick="CargarDatosAsync" disabled="@isConsultando">
+                        @if (isConsultando) { <span class="spinner-border spinner-border-sm"></span> }
+                        else { <i class="bi bi-search"></i> } Consultar
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        @if (_busquedaRealizada)
+        {
+            <div style="background: white; border-radius: 16px; padding: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden;">
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                        <thead>
+                            <tr style="background: #f8fafc; border-bottom: 2px solid #f1f5f9; text-align: left;">
+                                <th style="padding: 12px 20px;">Fecha / Hora</th>
+                                <th style="padding: 12px 20px;">Usuario</th>
+                                <th style="padding: 12px 20px;">Módulo</th>
+                                <th style="padding: 12px 20px;">Acción</th>
+                                <th style="padding: 12px 20px;">Detalle</th>
+                                <th style="padding: 12px 20px;">IP</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var i in auditoriaResultados)
+                            {
+                                <tr style="border-bottom: 1px solid #f8fafc;">
+                                    <td style="padding: 12px 20px;">
+                                        <div style="font-weight: 600;">@i.fechaHora.ToString("dd/MM/yyyy")</div>
+                                        <div style="font-size: 11px; color:#94a3b8;">@i.fechaHora.ToString("HH:mm:ss")</div>
+                                    </td>
+                                    <td style="padding: 12px 20px;">@i.usuario</td>
+                                    <td style="padding: 12px 20px;"><span class="badge-status badge-blue">@i.modulo</span></td>
+                                    <td style="padding: 12px 20px;"><span class="badge-status @ObtenerBadgeClase(i.accion)">@i.accion</span></td>
+                                    <td style="padding: 12px 20px; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">@i.detalle</td>
+                                    <td style="padding: 12px 20px; font-family: monospace; font-size: 11px;">@i.ip</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private DateTime fechaDesde = DateTime.Today.AddDays(-7);
+    private DateTime fechaHasta = DateTime.Today;
+    private string usuarioFiltro = "";
+    private string moduloFiltro = "";
+    private bool isConsultando = false;
+    private bool _busquedaRealizada = false;
+    private List<AuditoriaModel> auditoriaResultados = new();
+    private List<UsuarioModel> listaUsuarios = new();
+
+    private int totalAccesos = 0;
+    private int totalModificaciones = 0;
+    private int totalAnulaciones = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        listaUsuarios = (await UsuariosService.ObtenerUsuarios()).ToList();
+    }
+
+    private async Task CargarDatosAsync()
+    {
+        try
+        {
+            isConsultando = true;
+            _busquedaRealizada = false;
+            StateHasChanged();
+            
+            auditoriaResultados = await AuditoriaService.ObtenerAuditoriaAsync(fechaDesde, fechaHasta.AddDays(1).AddSeconds(-1), usuarioFiltro, moduloFiltro);
+            
+            totalAccesos = auditoriaResultados.Count(a => a.accion.Contains("LOGIN", StringComparison.OrdinalIgnoreCase));
+            totalModificaciones = auditoriaResultados.Count(a => a.accion.Contains("MODIFICACION", StringComparison.OrdinalIgnoreCase));
+            totalAnulaciones = auditoriaResultados.Count(a => a.accion.Contains("ANULACION", StringComparison.OrdinalIgnoreCase));
+            
+            _busquedaRealizada = true;
+        }
+        finally
+        {
+            isConsultando = false;
+        }
+    }
+
+    private string ObtenerBadgeClase(string accion)
+    {
+        if (accion.Contains("LOGIN", StringComparison.OrdinalIgnoreCase)) return "badge-blue";
+        if (accion.Contains("ANULACION", StringComparison.OrdinalIgnoreCase)) return "badge-red";
+        if (accion.Contains("MODIFICACION", StringComparison.OrdinalIgnoreCase)) return "badge-yellow";
+        return "badge-green";
+    }
+}

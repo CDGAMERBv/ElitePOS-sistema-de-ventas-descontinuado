@@ -1,0 +1,341 @@
+@using ElitePOS.Shared.Models
+@using ElitePOS.Client.Services
+@inject IConfiguracionEmpresaService ConfiguracionService
+@inject IConfiguracionImpresionService ImpresionService
+@inject IJSRuntime JSRuntime
+
+@if (Visible && venta != null)
+{
+    <!-- ESTILOS DINÁMICOS -->
+    <style>
+        /* Aislamiento Estricto - Ocultar Todo excepto el comprobante */
+        @@media print {
+            body * { visibility: hidden !important; }
+            .print-zone, .print-zone * { visibility: visible !important; }
+            .print-zone { 
+                position: absolute !important; 
+                left: 0 !important; 
+                top: 0 !important; 
+                margin: 0 !important; 
+                padding: 0 !important;
+                visibility: visible !important;
+            }
+            .no-print { display: none !important; }
+            
+            /* Reset de Márgenes del Navegador */
+            @@page { margin: 0; }
+        }
+
+        /* Estilos Base (Pantalla) Overlay */
+        .cp-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+            z-index: 10000; display: flex; align-items: center; justify-content: center;
+            overflow-y: auto; padding: 20px;
+        }
+
+        /* â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â
+           ESTILOS FORMATO 80mm (Ticketera)
+           â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â */
+        .fmt-80mm {
+            background: white; width: 80mm; padding: 4mm; font-family: 'Courier New', Courier, monospace;
+            font-size: 11px; color: black; box-shadow: 0 10px 30px rgba(0,0,0,0.3); border-radius: 4px;
+        }
+        @@media print {
+            .fmt-80mm { width: 80mm !important; box-shadow: none !important; border-radius: 0 !important; }
+            @@page { size: 80mm auto; }
+        }
+        .t-center { text-align: center; }
+        .t-bold { font-weight: bold; }
+        .t-sep { border-top: 1px dashed #000; margin: 6px 0; }
+        .t-items { width: 100%; border-collapse: collapse; }
+        .t-total-row { display: flex; justify-content: space-between; font-weight: bold; margin-top: 4px; font-size: 13px; }
+
+        /* â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â
+           ESTILOS FORMATO A4 / A5
+           â•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Ââ•Â */
+        .fmt-a4 {
+            background: white; width: 210mm; min-height: 297mm; padding: 20mm;
+            font-family: Arial, sans-serif; color: #1f2937; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        @@media print {
+            .fmt-a4 { width: 210mm !important; height: auto !important; padding: 15mm !important; box-shadow: none !important; }
+            @@page { size: A4; }
+        }
+        .a4-header { display: flex; justify-content: space-between; margin-bottom: 30px; border-bottom: 2px solid #374151; padding-bottom: 15px; }
+        .a4-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .a4-table th { background: #f3f4f6; padding: 10px; text-align: left; border-bottom: 2px solid #d1d5db; }
+        .a4-table td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; }
+        .a4-invoice-box { border: 2px solid #374151; padding: 15px; width: 200px; text-align: center; }
+
+        /* Botones de acción flotantes */
+        .cp-actions {
+            position: fixed; bottom: 30px; right: 30px; display: flex; gap: 12px; z-index: 10001;
+        }
+        .cp-btn {
+            padding: 12px 24px; border-radius: 50px; border: none; font-weight: bold; cursor: pointer;
+            display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); transition: all 0.2s;
+        }
+        .cp-btn-print { background: #2563eb; color: white; }
+        .cp-btn-close { background: #ef4444; color: white; }
+        .cp-btn:hover { transform: translateY(-3px); filter: brightness(1.1); }
+    </style>
+
+    <div class="cp-overlay no-print" @onclick="Cerrar">
+        <div class="print-zone @(Formato == "80mm" ? "fmt-80mm" : "fmt-a4")" @onclick:stopPropagation>
+            
+            @if (Formato == "80mm")
+            {
+                <!-- DISEÍ‘O TICKET 80mm -->
+                <div class="t-center">
+                    @if (mostrarLogo && !string.IsNullOrEmpty(logoUrl)) { <img src="@logoUrl" style="max-width:50mm; margin-bottom:8px;" /> }
+                    <div class="t-bold" style="font-size: 14px;">@nombreEmpresa</div>
+                    <div>RUC: @rucEmpresa</div>
+                    <div style="font-size: 10px;">@direccionCompleta</div>
+                    <div>Tel: @telefonoEmpresa</div>
+                </div>
+
+                <div class="t-sep"></div>
+
+                <div class="t-center">
+                    <div class="t-bold">
+                        @{ bool enviadoSunat80 = venta.estadoSunat == "ENVIADO" || venta.estadoSunat == "ACEPTADO" || venta.estadoSunat == "Aceptado"; }
+                        @(enviadoSunat80 ? $"{venta.tipoComprobante.ToUpper()} ELECTRÍ“NICA" : "TICKET DE VENTA (CONTROL INTERNO)")
+                    </div>
+                    <div class="t-bold">@venta.numeroComprobante</div>
+                    <div style="font-size: 10px;">Fecha: @venta.fechaHora.ToString("dd/MM/yyyy HH:mm:ss")</div>
+                </div>
+
+                <div class="t-sep"></div>
+
+                <div>
+                    <div class="t-bold">CLIENTE: @venta.cliente</div>
+                    @if (!string.IsNullOrEmpty(venta.numeroDocumentoCliente)) { <div>DOC: @venta.numeroDocumentoCliente</div> }
+                    @if (!string.IsNullOrEmpty(venta.metodoPago)) { <div>PAGO: @venta.metodoPago</div> }
+                </div>
+
+                <div class="t-sep"></div>
+
+                <table class="t-items">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;">DESCRIP.</th>
+                            <th style="text-align:center;">CANT.</th>
+                            <th style="text-align:right;">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in venta.items)
+                        {
+                            <tr>
+                                <td>@item.nombreProducto</td>
+                                <td style="text-align:center;">@item.cantidad</td>
+                                <td style="text-align:right;">@item.subtotal.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <div class="t-sep"></div>
+
+                <div class="t-total-row">
+                    <span>TOTAL A PAGAR:</span>
+                    <span>S/ @venta.total.ToString("N2")</span>
+                </div>
+
+                <div class="t-sep"></div>
+
+                <div class="t-center" style="font-size: 10px;">
+                    <div>Son: @MontoEnLetras(venta.total)</div>
+                    @if (!string.IsNullOrEmpty(Observaciones))
+                    {
+                        <div style="margin-top: 8px;"><span class="t-bold">NOTA:</span> @Observaciones</div>
+                    }
+                    <div style="margin-top: 10px; font-weight: bold;">
+                        @(string.IsNullOrEmpty(mensajeDespedida) ? "¡GRACIAS POR SU COMPRA!" : mensajeDespedida)
+                    </div>
+                </div>
+            }
+            else
+            {
+                <!-- DISEÍ‘O A4 / A5 -->
+                <div class="a4-header">
+                    <div>
+                        @if (!string.IsNullOrEmpty(logoUrl)) { <img src="@logoUrl" style="height: 70px; margin-bottom: 10px;" /> }
+                        <h1 style="margin:0; font-size: 24px;">@nombreEmpresa</h1>
+                        <p style="margin:2px 0; font-size:13px;">@direccionCompleta</p>
+                        <p style="margin:2px 0; font-size:13px;">RUC: @rucEmpresa | Tel: @telefonoEmpresa</p>
+                    </div>
+                    <div class="a4-invoice-box">
+                        <div style="font-weight:bold;">R.U.C. @rucEmpresa</div>
+                        @{ bool enviadoSunatA4 = venta.estadoSunat == "ENVIADO" || venta.estadoSunat == "ACEPTADO" || venta.estadoSunat == "Aceptado"; }
+                        <div style="background:#374151; color:white; margin:10px -15px; padding:5px; font-weight:bold;">
+                            @(enviadoSunatA4 ? $"{venta.tipoComprobante.ToUpper()} ELECTRÍ“NICA" : "TICKET DE VENTA (CONTROL INTERNO)")
+                        </div>
+                        <div style="font-size:18px; font-weight:bold; color: #ef4444;">@venta.numeroComprobante</div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px; font-size: 13px;">
+                    <div>
+                        <p><strong>CLIENTE:</strong> @venta.cliente</p>
+                        <p><strong>RUC/DNI:</strong> @venta.numeroDocumentoCliente</p>
+                        <p><strong>DIRECCIÍ“N:</strong> @DireccionCliente</p>
+                    </div>
+                    <div>
+                        <p><strong>FECHA EMISIÍ“N:</strong> @venta.fechaHora.ToString("dd/MM/yyyy")</p>
+                        <p><strong>PAGO:</strong> @venta.metodoPago</p>
+                    </div>
+                </div>
+
+                <table class="a4-table">
+                    <thead>
+                        <tr>
+                            <th style="width:10%; text-align:center;">CANT.</th>
+                            <th style="width:60%;">DESCRIPCIÍ“N</th>
+                            <th style="width:15%; text-align:right;">P. UNIT</th>
+                            <th style="width:15%; text-align:right;">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in venta.items)
+                        {
+                            <tr>
+                                <td style="text-align:center;">@item.cantidad</td>
+                                <td>@item.nombreProducto</td>
+                                <td style="text-align:right;">@item.precioUnitario.ToString("N2")</td>
+                                <td style="text-align:right;">@item.subtotal.ToString("N2")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <div style="float: right; width: 250px;">
+                    <div style="display:flex; justify-content:space-between; padding:5px 0;">
+                        <span>OP. GRAVADA</span>
+                        <span>S/ @((venta.total / 1.18m).ToString("N2"))</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; padding:5px 0;">
+                        <span>IGV (18%)</span>
+                        <span>S/ @((venta.total - (venta.total / 1.18m)).ToString("N2"))</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; padding:10px 0; border-top: 2px solid #374151; font-weight:bold; font-size:16px;">
+                        <span>TOTAL</span>
+                        <span>S/ @venta.total.ToString("N2")</span>
+                    </div>
+                </div>
+
+                <div style="clear:both; margin-top:30px; font-size:12px;">
+                    <p><strong>SON:</strong> @MontoEnLetras(venta.total)</p>
+                    @if (!string.IsNullOrEmpty(Observaciones))
+                    {
+                        <div style="margin-top:15px; border: 1px dashed #ccc; padding: 10px; border-radius: 4px;">
+                            <strong>OBSERVACIONES:</strong><br/>
+                            @Observaciones
+                        </div>
+                    }
+                </div>
+
+                <div style="margin-top:50px; text-align:center; font-size:11px; color:#6b7280; border-top:1px solid #e5e7eb; padding-top:10px;">
+                    Representación impresa del Comprobante Electrónico.
+                </div>
+            }
+        </div>
+
+        <!-- ACCIONES -->
+        <div class="cp-actions no-print">
+            <button class="cp-btn cp-btn-close" @onclick="Cerrar">
+                <i class="bi bi-x-circle"></i> Cerrar
+            </button>
+            <button class="cp-btn cp-btn-print" @onclick="EjecutarImpresion">
+                <i class="bi bi-printer"></i> Imprimir
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public VentaModel? venta { get; set; }
+    [Parameter] public string Formato { get; set; } = "80mm"; // 80mm, A4, A5
+    [Parameter] public bool AutoImprimir { get; set; }
+    [Parameter] public EventCallback OnCerrar { get; set; }
+
+    // Parámetros Opcionales
+    [Parameter] public string? Observaciones { get; set; }
+    [Parameter] public string? DireccionCliente { get; set; }
+
+    private string nombreEmpresa = "MI EMPRESA";
+    private string rucEmpresa = "";
+    private string direccionCompleta = "";
+    private string telefonoEmpresa = "";
+    private string logoUrl = "";
+    
+    // Configuración de Impresión
+    private bool mostrarLogo = true;
+    private string mensajeDespedida = "";
+    private bool yaImprimio = false;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Visible && venta != null)
+        {
+            await CargarConfig();
+            
+            if (AutoImprimir && !yaImprimio)
+            {
+                yaImprimio = true;
+                await Task.Delay(800); // Dar tiempo al renderizado de estilos
+                await EjecutarImpresion();
+            }
+        }
+        else
+        {
+            yaImprimio = false; // Reset al ocultar
+        }
+    }
+
+    private async Task CargarConfig()
+    {
+        var config = await ConfiguracionService.ObtenerConfiguracion();
+        if (config != null)
+        {
+            nombreEmpresa = config.nombreComercial ?? config.razonSocial ?? "ELITE POS";
+            rucEmpresa = config.ruc ?? "";
+            direccionCompleta = $"{config.direccion} {config.distrito} {config.provincia}";
+            telefonoEmpresa = config.telefono ?? "";
+            logoUrl = config.LogoUrl ?? "";
+        }
+        
+        var configImp = await ImpresionService.ObtenerConfiguracion();
+        if (configImp != null)
+        {
+            mostrarLogo = configImp.MostrarLogo;
+            mensajeDespedida = configImp.PieDePagina ?? "¡GRACIAS POR SU PREFERENCIA!";
+        }
+    }
+
+    private async Task EjecutarImpresion()
+    {
+        await JSRuntime.InvokeVoidAsync("window.print");
+    }
+
+    private async Task Cerrar()
+    {
+        yaImprimio = false;
+        await OnCerrar.InvokeAsync();
+    }
+
+    private string MontoEnLetras(decimal monto)
+    {
+        // En una implementación real, esto vendría de un servicio de conversión
+        return "SOLES";
+    }
+}
+
+
+
+
+
+
+
+

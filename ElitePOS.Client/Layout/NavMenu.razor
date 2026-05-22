@@ -1,0 +1,423 @@
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Routing
+@inject NavigationManager NavigationManager
+@inject ISesionService SesionService
+@inject IConfiguracionEmpresaService ConfiguracionService
+@inject ElitePOS.Client.Services.PuntoVentaStateService StateService
+@implements IDisposable
+@using ElitePOS.Services
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+<div class="elite-sidebar">
+    <div class="sidebar-header">
+        <div class="logo-container">
+            <div class="logo-icon">
+                @if (!string.IsNullOrEmpty(ConfiguracionService.Configuracion?.logoUrl))
+                {
+                    <img src="@ConfiguracionService.Configuracion.logoUrl" alt="Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" />
+                }
+                else
+                {
+                    <i class="bi bi-cash-stack"></i>
+                }
+            </div>
+            <div class="logo-text">
+                @if (!string.IsNullOrEmpty(ConfiguracionService.Configuracion?.nombreComercial))
+                {
+                    <span class="logo-main">@ConfiguracionService.Configuracion.nombreComercial</span>
+                }
+                else
+                {
+                    <span class="logo-main">Elite</span>
+                    <span class="logo-accent">POS</span>
+                }
+            </div>
+        </div>
+        <div class="user-badge">
+            <i class="bi bi-person-circle"></i>
+            <span>@(SesionService.UsuarioActual?.nombre ?? "Usuario")</span>
+        </div>
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="nav-section">
+            <div class="nav-category-title">PRINCIPAL</div>
+            
+            <NavLink class="elite-nav-link" href="/home" Match="NavLinkMatch.All">
+                <i class="bi bi-house-door nav-icon"></i>
+                <span>Inicio</span>
+            </NavLink>
+
+            <NavLink class="elite-nav-link" href="ventas">
+                <i class="bi bi-upc-scan nav-icon"></i>
+                <span>Punto de Venta</span>
+            </NavLink>
+
+            @if (ConfiguracionService.Configuracion?.moduloCajaChicaActivo ?? false)
+            {
+                <NavLink class="elite-nav-link" href="caja">
+                    <i class="bi bi-safe nav-icon"></i>
+                    <span>Caja Chica</span>
+                </NavLink>
+            }
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-category-title">GESTIÓN</div>
+            
+            <NavLink class="elite-nav-link" href="inventario">
+                <i class="bi bi-box-seam nav-icon"></i>
+                <span>Inventario</span>
+            </NavLink>
+
+            <NavLink class="elite-nav-link" href="compras">
+                <i class="bi bi-cart-plus nav-icon"></i>
+                <span>Compras</span>
+            </NavLink>
+
+            <NavLink class="elite-nav-link" href="clientes">
+                <i class="bi bi-people nav-icon"></i>
+                <span>Clientes</span>
+            </NavLink>
+
+            <NavLink class="elite-nav-link" href="/historial-ventas">
+                <i class="bi bi-receipt nav-icon"></i>
+                <span>Ventas Realizadas</span>
+            </NavLink>
+
+            <NavLink class="elite-nav-link" href="proformas">
+                <i class="bi bi-file-text nav-icon"></i>
+                <span>Proformas</span>
+            </NavLink>
+
+            <NavLink class="elite-nav-link" href="cuentas-por-cobrar">
+                <i class="bi bi-currency-dollar nav-icon"></i>
+                <span>Cuentas por Cobrar</span>
+            </NavLink>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-category-title">REPORTES</div>
+            
+            <NavLink class="elite-nav-link" href="reportes" Match="NavLinkMatch.All">
+                <i class="bi bi-graph-up nav-icon"></i>
+                <span>Reportes Generales</span>
+            </NavLink>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-category-title">AJUSTES</div>
+            
+            <NavLink class="elite-nav-link" href="configuracion">
+                <i class="bi bi-gear nav-icon"></i>
+                <span>Configuración</span>
+            </NavLink>
+
+            <NavLink class="elite-nav-link" href="integraciones">
+                <i class="bi bi-grid-1x2 nav-icon"></i>
+                <span>Integraciones</span>
+            </NavLink>
+        </div>
+
+        <!-- ========================================================== -->
+        <!-- BOTÓN CERRAR SESIÓN - ANCLADO AL FONDO                      -->
+        <!-- ========================================================== -->
+        <div class="nav-section logout-section">
+            <button class="logout-btn" @onclick="CerrarSesion">
+                <i class="bi bi-box-arrow-left"></i>
+                <span>Cerrar Sesión</span>
+            </button>
+        </div>
+    </nav>
+
+    <div class="sidebar-footer">
+        <div class="footer-item">
+            <i class="bi bi-info-circle"></i>
+            <span>Versión 2.0.1</span>
+        </div>
+        <div class="footer-item">
+            <i class="bi bi-shield-check"></i>
+            <span>Licencia Activa</span>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ============================================================ */
+/* SIDEBAR PROFESIONAL ELITEPOS                                 */
+/* ============================================================ */
+
+.elite-sidebar {
+    width: 260px;
+    height: 100vh;
+    background: #1E293B;
+    border-right: 1px solid #E2E8F0;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 1000;
+    overflow: hidden;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.15);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+/* Header del Sidebar */
+.sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid #E2E8F0;
+}
+
+.logo-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.logo-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.logo-text {
+    display: flex;
+    flex-direction: column;
+}
+
+.logo-main {
+    font-size: 20px;
+    font-weight: 700;
+    color: #ffffff;
+    line-height: 1;
+}
+
+.logo-accent {
+    font-size: 20px;
+    font-weight: 700;
+    color: #667eea;
+    line-height: 1;
+}
+
+.user-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: #CBD5E1;
+    opacity: 0.85;
+    font-size: 12px;
+    border: 1px solid #E2E8F0;
+}
+
+.user-badge i {
+    color: #667eea;
+    font-size: 14px;
+}
+
+/* Navegación */
+.sidebar-nav {
+    flex: 1;
+    padding: 16px 0;
+    overflow-y: auto;
+}
+
+.nav-section {
+    margin-bottom: 24px;
+}
+
+.nav-category-title {
+    color: #CBD5E1;
+    opacity: 0.6;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    margin-bottom: 12px;
+    padding: 0 20px;
+    text-transform: uppercase;
+}
+
+/* Links de Navegación */
+.elite-nav-link {
+    display: flex;
+    align-items: center;
+    padding: 12px 20px;
+    margin: 2px 12px;
+    border-radius: 8px;
+    color: #CBD5E1;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    font-size: 14px;
+    position: relative;
+}
+
+.elite-nav-link:hover {
+    background: rgba(79, 70, 229, 0.08);
+    color: #4F46E5;
+    transform: translateX(2px);
+}
+
+.elite-nav-link.active {
+    background: #4F46E5;
+    color: #FFFFFF !important;
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+}
+
+/* Iconos de Navegación */
+.nav-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 18px;
+    opacity: 0.8;
+    transition: all 0.3s ease;
+    margin-right: 12px;
+}
+
+.badge-new {
+    background: #10b981;
+    color: white;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 6px;
+    margin-left: auto;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 2px 4px rgba(16, 185, 129, 0.2);
+}
+
+.elite-nav-link:hover .nav-icon,
+.elite-nav-link.active .nav-icon {
+    opacity: 1.0;
+}
+
+/* Footer del Sidebar */
+.sidebar-footer {
+    padding: 16px 20px;
+    border-top: 1px solid #E2E8F0;
+}
+
+.footer-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #CBD5E1;
+    opacity: 0.5;
+    font-size: 11px;
+    margin-bottom: 6px;
+}
+
+.footer-item i {
+    color: #667eea;
+    font-size: 12px;
+}
+
+/* Botón Cerrar Sesión */
+.logout-section {
+    margin-top: auto;
+    padding: 16px 20px;
+    border-top: 1px solid #E2E8F0;
+}
+
+.logout-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid #ef4444;
+    border-radius: 8px;
+    color: #ef4444;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.logout-btn:hover {
+    background: #ef4444;
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.logout-btn i {
+    font-size: 14px;
+}
+
+/* Responsive */
+@@media (max-width: 768px) {
+    .elite-sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+    
+    .elite-sidebar.open {
+        transform: translateX(0);
+    }
+}
+
+/* Scrollbar personalizado */
+.sidebar-nav::-webkit-scrollbar {
+    width: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(102, 126, 234, 0.3);
+    border-radius: 2px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(102, 126, 234, 0.5);
+}
+</style>
+
+@code {
+    private bool isSidebarOpen = false;
+
+    protected override void OnInitialized()
+    {
+        ConfiguracionService.OnChange += OnConfiguracionChanged;
+        StateService.OnChange += OnConfiguracionChanged;
+    }
+
+    private void OnConfiguracionChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        ConfiguracionService.OnChange -= OnConfiguracionChanged;
+        StateService.OnChange -= OnConfiguracionChanged;
+    }
+
+    private void ToggleSidebar()
+    {
+        isSidebarOpen = !isSidebarOpen;
+    }
+
+    private void CerrarSesion()
+    {
+        SesionService.CerrarSesion();
+        NavigationManager.NavigateTo("/", forceLoad: true);
+    }
+}

@@ -1,0 +1,115 @@
+@using ElitePOS.Client.Layout
+@using ElitePOS.Client.Components
+@inherits LayoutComponentBase
+@using ElitePOS.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@inject ISesionService SesionService
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+@inject IConfiguracionEmpresaService ConfiguracionService
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+
+        // Configurar el AuthenticationStateProvider
+        if (AuthenticationStateProvider is CustomAuthenticationStateProvider customProvider)
+        {
+            if (SesionService is ElitePOS.Client.Services.SesionService clientSesionService)
+            {
+                clientSesionService.SetAuthenticationStateProvider(customProvider);
+            }
+        }
+
+        // Cargar sesión desde localStorage al iniciar la aplicación
+        await SesionService.CargarSesionDesdeStorage();
+
+        // Precargar configuración global de empresa en caché
+        await ConfiguracionService.ObtenerConfiguracion();
+    }
+}
+<div class="page">
+    <GlobalToast />
+    <ChatBot />
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <article class="content">
+            @Body
+        </article>
+    </main>
+</div>
+
+<style>
+/* TIPOGRAFÍA DINÁMICA */
+html, body {
+    background-color: #F8FAFC;
+    color: #111827;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+}
+
+.page {
+    display: flex;
+    min-height: 100vh;
+    background: #F8FAFC;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+.sidebar {
+    width: 260px;
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    z-index: 1000;
+    background: #1E293B;
+    border-right: 1px solid #E2E8F0;
+}
+
+main {
+    flex: 1;
+    margin-left: 260px;
+    background: #F8FAFC;
+    min-height: 100vh;
+    width: calc(100% - 260px);
+}
+
+.content {
+    padding: 2rem;
+    margin: 0;
+    width: 100%;
+    max-width: none;
+}
+
+@@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+    
+    .sidebar.open {
+        transform: translateX(0);
+    }
+    
+    main {
+        margin-left: 0;
+        width: 100%;
+    }
+    
+    .content {
+        padding: 1rem;
+    }
+}
+</style>
+
+
+
+
+

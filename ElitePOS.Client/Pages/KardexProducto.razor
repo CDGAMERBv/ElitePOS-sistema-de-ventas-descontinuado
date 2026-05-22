@@ -1,0 +1,213 @@
+﻿@page "/inventario/kardex/{productoId}"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Services
+@using ElitePOS.Client.Services
+@inject IKardexService KardexService
+@inject IInventarioService InventarioService
+@inject ISesionService SesionService
+@inject IConfiguracionEmpresaService ConfiguracionService
+@inject NavigationManager NavigationManager
+@inject GestionStateService StateService
+@inject IJSRuntime JS
+@implements IDisposable
+
+<style>
+    .k-page { min-height: 100vh; background: #f8fafc; padding: 24px; }
+    .k-card { background: white; border-radius: 16px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; }
+</style>
+
+<div class="k-page">
+    <div style="max-width: 1200px; margin: 0 auto;">
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+            <div>
+                <h1 style="font-size: 28px; font-weight: 800; color: #1e293b; margin: 0;">Kardex de Producto</h1>
+                <p style="color: #64748b; margin: 4px 0 0 0;">Control de movimientos e historial de stock</p>
+            </div>
+            <div style="display: flex; gap: 12px;">
+                <button class="btn btn-outline-secondary" @onclick='() => NavigationManager.NavigateTo("/inventario")'>
+                    <i class="bi bi-arrow-left me-2"></i> Volver
+                </button>
+                <button class="btn btn-dark" @onclick="AbrirModalAjuste" style="font-weight: 700;">
+                    <i class="bi bi-plus-lg me-2"></i> AJUSTE MANUAL
+                </button>
+            </div>
+        </div>
+
+        @if (Cargando)
+        {
+            <div style="display: flex; justify-content: center; padding: 100px;">
+                <div class="spinner-border text-primary"></div>
+            </div>
+        }
+        else if (Producto == null)
+        {
+            <div class="alert alert-warning">No se encontró el producto en el catálogo.</div>
+        }
+        else
+        {
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-bottom: 32px;">
+                <div class="k-card">
+                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Producto</label>
+                    <h3 style="font-size: 18px; font-weight: 700; margin: 4px 0;">@Producto.nombre</h3>
+                    <p style="font-size: 13px; color: #94a3b8; margin: 0;">SKU: @Producto.codigoBarras</p>
+                </div>
+                <div class="k-card">
+                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Stock Actual</label>
+                    <h3 style="font-size: 24px; font-weight: 800; color: #3b82f6; margin: 4px 0;">@Producto.stock</h3>
+                    <p style="font-size: 13px; color: #94a3b8; margin: 0;">Mínimo: @Producto.stockMinimo</p>
+                </div>
+                <div class="k-card">
+                    <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Costo Promedio</label>
+                    <h3 style="font-size: 24px; font-weight: 800; color: #10b981; margin: 4px 0;">S/ @Producto.costoPromedio.ToString("N2")</h3>
+                    <p style="font-size: 13px; color: #94a3b8; margin: 0;">Venta: S/ @Producto.precioVenta.ToString("N2")</p>
+                </div>
+            </div>
+
+            <div class="k-card" style="margin-bottom: 24px;">
+                <div style="display: flex; gap: 16px; align-items: flex-end;">
+                    <div><label style="font-size: 11px; font-weight: 700; color: #64748b;">DESDE</label><input type="date" @bind="FechaDesde" class="form-control" /></div>
+                    <div><label style="font-size: 11px; font-weight: 700; color: #64748b;">HASTA</label><input type="date" @bind="FechaHasta" class="form-control" /></div>
+                    <button class="btn btn-primary" @onclick="Cargar" style="font-weight: 700;">FILTRAR</button>
+                    <button class="btn btn-outline-success" @onclick="ExportarExcel"><i class="bi bi-file-earmark-excel"></i></button>
+                </div>
+            </div>
+
+            <div class="k-card" style="padding: 0; overflow: hidden;">
+                <table class="table table-hover mb-0" style="font-size: 13px;">
+                    <thead class="bg-light">
+                        <tr>
+                            <th style="padding: 16px;">Fecha / Hora</th>
+                            <th style="padding: 16px;">Concepto</th>
+                            <th style="padding: 16px; text-align: center;">Cantidad</th>
+                            <th style="padding: 16px; text-align: right;">Ant.</th>
+                            <th style="padding: 16px; text-align: right;">Desp.</th>
+                            <th style="padding: 16px;">Usuario</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in Movimientos)
+                        {
+                            <tr>
+                                <td style="padding: 16px;">@m.fecha.ToString("dd/MM/yyyy HH:mm")</td>
+                                <td style="padding: 16px;">
+                                    <div style="font-weight: 600;">@m.concepto</div>
+                                    <span style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: @(m.tipoMovimiento?.ToUpper() == "ENTRADA" ? "#ecfdf5" : "#fee2e2"); color: @(m.tipoMovimiento?.ToUpper() == "ENTRADA" ? "#10b981" : "#ef4444");">
+                                        @m.tipoMovimiento?.ToUpper()
+                                    </span>
+                                </td>
+                                <td style="padding: 16px; text-align: center; font-weight: 700;">
+                                    @(m.tipoMovimiento?.ToUpper() == "ENTRADA" ? "+" : "-")@m.cantidad
+                                </td>
+                                <td style="padding: 16px; text-align: right; color: #64748b;">@m.saldoAnterior</td>
+                                <td style="padding: 16px; text-align: right; font-weight: 800;">@m.saldoActual</td>
+                                <td style="padding: 16px; color: #64748b;">@m.usuarioNombre</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@if (MostrarModalAjuste)
+{
+    <div style="position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+        <div class="k-card" style="width: 90%; max-width: 400px; padding: 32px;">
+            <h2 style="font-size: 18px; font-weight: 800; margin-bottom: 24px;">Crear Ajuste Manual</h2>
+            
+            <div class="mb-3">
+                <label style="font-size: 12px; font-weight: 700; color: #64748b;">TIPO DE MOVIMIENTO</label>
+                <select @bind="AjusteTipo" class="form-select">
+                    <option value="ENTRADA">Entrada (+)</option>
+                    <option value="SALIDA">Salida (-)</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label style="font-size: 12px; font-weight: 700; color: #64748b;">CANTIDAD</label>
+                <input type="number" @bind="AjusteCantidad" class="form-control" />
+            </div>
+            <div class="mb-4">
+                <label style="font-size: 12px; font-weight: 700; color: #64748b;">MOTIVO / CONCEPTO</label>
+                <input type="text" @bind="AjusteMotivo" class="form-control" placeholder="Ej: Mercadería dañada, Merma" />
+            </div>
+
+            <div style="display: flex; gap: 12px;">
+                <button class="btn btn-light flex-fill" @onclick="() => MostrarModalAjuste = false">CANCELAR</button>
+                <button class="btn btn-dark flex-fill" @onclick="GuardarAjuste" disabled="@procesando">
+                    @if (procesando) { <span class="spinner-border spinner-border-sm me-2"></span> }
+                    CONFIRMAR
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string productoId { get; set; } = string.Empty;
+    private ProductoModel? Producto;
+    private List<MovimientoKardexModel> Movimientos = new();
+    private DateTime FechaDesde = DateTime.Today.AddDays(-30);
+    private DateTime FechaHasta = DateTime.Today;
+    private bool Cargando = true;
+    private bool procesando = false;
+    
+    private bool MostrarModalAjuste = false;
+    private string AjusteTipo = "ENTRADA";
+    private int AjusteCantidad = 1;
+    private string AjusteMotivo = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        StateService.OnChange += StateHasChanged;
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        try 
+        { 
+            Cargando = true; 
+            Producto = await InventarioService.ObtenerProductoPorId(productoId);
+            if (Producto != null)
+            {
+                Movimientos = (await KardexService.ObtenerKardexProducto(productoId, FechaDesde, FechaHasta)).OrderByDescending(m => m.fecha).ToList();
+            }
+        }
+        finally { Cargando = false; }
+    }
+
+    private void AbrirModalAjuste() { AjusteCantidad = 1; AjusteMotivo = ""; MostrarModalAjuste = true; }
+
+    private async Task GuardarAjuste()
+    {
+        if (AjusteCantidad <= 0) return;
+        try {
+            procesando = true;
+            var mov = new MovimientoKardexModel
+            {
+                productoId = productoId,
+                productoNombre = Producto?.nombre ?? "",
+                tipoMovimiento = AjusteTipo,
+                cantidad = AjusteCantidad,
+                concepto = $"AJUSTE MANUAL: {AjusteMotivo}",
+                usuarioId = SesionService.UsuarioActual?.usuarioId ?? "",
+                usuarioNombre = SesionService.UsuarioActual?.nombre ?? "Admin",
+                fecha = DateTime.Now
+            };
+
+            var result = await KardexService.RegistrarMovimiento(mov);
+            if (result) {
+                MostrarModalAjuste = false;
+                await Cargar();
+            }
+        } finally {
+            procesando = false;
+        }
+    }
+
+    private async Task ExportarExcel() => await JS.InvokeVoidAsync("alert", "Exportando...");
+
+    public void Dispose() => StateService.OnChange -= StateHasChanged;
+}

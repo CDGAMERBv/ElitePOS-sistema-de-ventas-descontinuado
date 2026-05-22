@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ElitePOS</title>
+    <base href="/" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/app.css?v=3.0.1" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+
+    <link href="manifest.webmanifest" rel="manifest" />
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+</head>
+<body style="background-color: #0f172a; margin: 0; overflow: hidden;">
+    <div id="app">
+        <div class="loading-container">
+            <div class="loading-content">
+                <div class="logo-wrapper">
+                    <i class="bi bi-cart4"></i>
+                </div>
+                <div class="loading-text-wrapper">
+                    <span class="main-text">Elite<span class="accent-text">POS</span></span>
+                    <p class="sub-text">Cargando recursos...</p>
+                </div>
+                <div class="progress-container">
+                    <div class="progress-bar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .loading-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #0f172a; /* Mismo color que tu Login */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            z-index: 9999;
+        }
+
+        .loading-content {
+            text-align: center;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        .logo-wrapper {
+            font-size: 4rem;
+            color: #3b82f6;
+            margin-bottom: 15px;
+            animation: pulse 2s infinite;
+        }
+
+        .loading-text-wrapper {
+            margin-bottom: 30px;
+        }
+
+        .main-text {
+            color: white;
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: 1px;
+        }
+
+        .accent-text {
+            color: #3b82f6;
+        }
+
+        .sub-text {
+            color: #94a3b8;
+            font-size: 1rem;
+            margin-top: 5px;
+        }
+
+        .progress-container {
+            width: 200px;
+            height: 4px;
+            background: #1e293b;
+            border-radius: 10px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 100%;
+            background: #3b82f6;
+            animation: loadingAnim 2s infinite ease-in-out;
+        }
+
+        @keyframes loadingAnim {
+            0% { transform: translateX(-100%); }
+            50% { transform: translateX(0); }
+            100% { transform: translateX(100%); }
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+
+    <div id="blazor-error-ui">
+        Ha ocurrido un error inesperado.
+        <a href="" class="reload">Recargar</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="site.js?v=3.0"></script>
+</body>
+</html>

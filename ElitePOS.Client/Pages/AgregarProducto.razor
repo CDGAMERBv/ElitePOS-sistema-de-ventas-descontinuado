@@ -1,0 +1,144 @@
+﻿@page "/agregar-producto"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Services
+@using ElitePOS.Client.Services
+@inject IInventarioService InventarioService
+@inject GestionStateService StateService
+@inject INotificationService NotificationService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<style>
+    .v-page { min-height: 100vh; background: #f8fafc; padding: 40px; }
+    .v-form-card { background: white; border-radius: 16px; padding: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); max-width: 800px; margin: 0 auto; border: 1px solid #e2e8f0; }
+    .v-label { display: block; font-size: 13px; font-weight: 700; color: #475569; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .v-input { width: 100%; padding: 12px 16px; border: 1px solid #e2e8f0; border-radius: 10px; font-size: 14px; transition: all 0.2s; outline: none; }
+    .v-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+</style>
+
+<div class="v-page">
+    <div style="max-width: 800px; margin: 0 auto 24px; display: flex; align-items: center; justify-content: space-between;">
+        <button class="btn btn-link text-decoration-none text-secondary fw-bold" @onclick='() => NavigationManager.NavigateTo("/inventario")'>
+            <i class="bi bi-arrow-left me-2"></i> Volver a Inventario
+        </button>
+        <h1 style="font-size: 24px; font-weight: 800; color: #1e293b; margin: 0;">Nuevo Producto</h1>
+    </div>
+
+    <div class="v-form-card">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+            <div style="grid-column: span 2;">
+                <label class="v-label">Nombre del Producto</label>
+                <input type="text" class="v-input" @bind="p.nombre" placeholder="Ej: Coca Cola 500ml" />
+            </div>
+
+            <div>
+                <label class="v-label">Categoría</label>
+                <input type="text" class="v-input" @bind="p.categoria" placeholder="Ej: Bebidas" />
+            </div>
+
+            <div>
+                <label class="v-label">Código de Barras / SKU</label>
+                <input type="text" class="v-input" @bind="p.codigoBarras" placeholder="00000000" />
+            </div>
+
+            <div>
+                <label class="v-label">Precio de Venta (S/)</label>
+                <input type="number" step="0.01" class="v-input" @bind="p.precioVenta" style="font-weight: 700; color: #6366f1;" />
+            </div>
+
+            <div>
+                <label class="v-label">Precio de Compra (S/)</label>
+                <input type="number" step="0.01" class="v-input" @bind="p.precioCompra" />
+            </div>
+
+            <div>
+                <label class="v-label">Stock Inicial</label>
+                <input type="number" class="v-input" @bind="p.stock" />
+            </div>
+
+            <div>
+                <label class="v-label">Stock Mínimo (Alerta)</label>
+                <input type="number" class="v-input" @bind="p.stockMinimo" />
+            </div>
+            
+            <div style="grid-column: span 2;">
+                <label class="v-label">Imagen</label>
+                <div style="border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; text-align: center; background: #f8fafc;">
+                    @if (!string.IsNullOrEmpty(p.imagenUrl))
+                    {
+                        <img src="@p.imagenUrl" style="max-width: 150px; border-radius: 8px; margin-bottom: 12px;" />
+                        <br />
+                        <button style="color: #ef4444; border: none; background: none; font-size: 13px; cursor: pointer;" @onclick="() => p.imagenUrl = null">Eliminar imagen</button>
+                    }
+                    else
+                    {
+                        <InputFile OnChange="HandleFileUpload" style="display: none;" id="file-upload" />
+                        <label for="file-upload" style="cursor: pointer; color: #6366f1; font-weight: 600;">
+                            <i class="bi bi-cloud-upload" style="font-size: 24px;"></i><br />
+                            Seleccionar Imagen del Producto
+                        </label>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 40px; padding-top: 24px; border-top: 1px solid #f1f5f9; display: flex; justify-content: flex-end; gap: 12px;">
+            <button class="btn btn-light" @onclick='() => NavigationManager.NavigateTo("/inventario")'>Cancelar</button>
+            <button class="btn btn-dark" style="font-weight: 700; display: flex; align-items: center; gap: 8px;" @onclick="Guardar" disabled="@Cargando">
+                @if (Cargando) { <span class="spinner-border spinner-border-sm"></span> }
+                <i class="bi bi-check-lg"></i> Guardar Producto
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private ProductoModel p = new ProductoModel 
+    { 
+        id = Guid.NewGuid().ToString(),
+        empresaId = "empresa-demo",
+        stock = 0,
+        stockMinimo = 5
+    };
+    private bool Cargando = false;
+
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
+    {
+        try {
+            var file = e.File;
+            if (file != null)
+            {
+                var buffer = new byte[file.Size];
+                await file.OpenReadStream().ReadAsync(buffer);
+                p.imagenUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(buffer)}";
+            }
+        } catch (Exception ex) {
+            await NotificationService.ShowError($"Error al subir imagen: {ex.Message}");
+        }
+    }
+
+    private async Task Guardar()
+    {
+        if (string.IsNullOrWhiteSpace(p.nombre))
+        {
+            await NotificationService.ShowWarning("El nombre es obligatorio");
+            return;
+        }
+
+        try 
+        {
+            Cargando = true;
+            var result = await InventarioService.AgregarProducto(p);
+            if (result)
+            {
+                await NotificationService.ShowSuccess("Producto agregado correctamente");
+                NavigationManager.NavigateTo("/inventario");
+            }
+        }
+        catch (Exception ex)
+        {
+            await NotificationService.ShowError($"Error: {ex.Message}");
+        }
+        finally { Cargando = false; }
+    }
+}

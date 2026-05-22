@@ -1,0 +1,108 @@
+@page "/suscripcion-vencida"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Client.Services
+@inject IConfiguracionEmpresaService ConfigService
+
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+    <div style="max-width: 600px; width: 100%; padding: 40px; background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); text-align: center;">
+        
+        <!-- Icono de advertencia -->
+        <div style="font-size: 80px; color: #ef4444; margin-bottom: 20px;">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+        </div>
+
+        <!-- Título -->
+        <h1 style="font-size: 32px; font-weight: 700; color: #1f2937; margin-bottom: 16px;">
+            Tu suscripción ha vencido
+        </h1>
+
+        @if (config != null)
+        {
+            <!-- Información del plan -->
+            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: left;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                    <i class="bi bi-info-circle-fill" style="color: #f59e0b; font-size: 20px;"></i>
+                    <strong>Detalles de tu cuenta</strong>
+                </div>
+                <div style="font-size: 14px; color: #78350f;">
+                    <p style="margin: 4px 0;"><strong>Empresa:</strong> @config.nombreComercial</p>
+                    <p style="margin: 4px 0;"><strong>Plan:</strong> @config.planActual.ToUpper()</p>
+                    <p style="margin: 4px 0;"><strong>Fecha de vencimiento:</strong> @config.fechaVencimiento.ToString("dd/MM/yyyy")</p>
+                    <p style="margin: 4px 0;"><strong>Días vencidos:</strong> @((DateTime.Now - config.fechaVencimiento).Days)</p>
+                </div>
+            </div>
+        }
+
+        <!-- Mensaje -->
+        <p style="font-size: 18px; color: #6b7280; margin-bottom: 32px; line-height: 1.6;">
+            Para continuar usando <strong>ElitePOS</strong> y acceder a todas sus funcionalidades,<br/>
+            renueva tu suscripción contactándonos por WhatsApp.
+        </p>
+
+        <!-- Beneficios -->
+        <div style="text-align: left; margin-bottom: 32px;">
+            <h3 style="font-size: 20px; font-weight: 600; color: #1f2937; margin-bottom: 16px;">
+                ¿Qué incluye tu plan?
+            </h3>
+            <ul style="list-style: none; padding: 0;">
+                <li style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; color: #4b5563;">
+                    <i class="bi bi-check-circle-fill" style="color: #10b981; font-size: 20px;"></i>
+                    <span>Gestión completa de inventario</span>
+                </li>
+                <li style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; color: #4b5563;">
+                    <i class="bi bi-check-circle-fill" style="color: #10b981; font-size: 20px;"></i>
+                    <span>Punto de VentaModel profesional</span>
+                </li>
+                <li style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; color: #4b5563;">
+                    <i class="bi bi-check-circle-fill" style="color: #10b981; font-size: 20px;"></i>
+                    <span>Comprobantes electrónicos SUNAT</span>
+                </li>
+                <li style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; color: #4b5563;">
+                    <i class="bi bi-check-circle-fill" style="color: #10b981; font-size: 20px;"></i>
+                    <span>Reportes y estadísticas</span>
+                </li>
+                <li style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px; color: #4b5563;">
+                    <i class="bi bi-check-circle-fill" style="color: #10b981; font-size: 20px;"></i>
+                    <span>Modo offline sin internet</span>
+                </li>
+                <li style="display: flex; align-items: center; gap: 12px; color: #4b5563;">
+                    <i class="bi bi-check-circle-fill" style="color: #10b981; font-size: 20px;"></i>
+                    <span>Soporte técnico prioritario</span>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Botón de WhatsApp -->
+        <a href="https://wa.me/51999999999?text=Hola,%20necesito%20renovar%20mi%20suscripción%20de%20ElitePOS" 
+           target="_blank"
+           style="display: inline-block; background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); color: white; padding: 16px 48px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 18px; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4); transition: transform 0.2s, box-shadow 0.2s;"
+           onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 6px 20px rgba(37, 211, 102, 0.5)';"
+           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 12px rgba(37, 211, 102, 0.4)';">
+            <i class="bi bi-whatsapp"></i>
+            Contactar por WhatsApp
+        </a>
+
+        <!-- Nota final -->
+        <p style="font-size: 14px; color: #9ca3af; margin-top: 32px; line-height: 1.5;">
+            ?Y'? <strong>¿Necesitas ayuda?</strong> Nuestro equipo está disponible de lunes a sábado de 8am a 8pm<br/>
+            para asistirte con la renovación de tu suscripción.
+        </p>
+    </div>
+</div>
+
+@code {
+    private ConfiguracionEmpresaModel? config;
+
+    protected override async Task OnInitializedAsync()
+    {
+        config = await ConfigService.ObtenerConfiguracion();
+    }
+}
+
+
+
+
+
+
+
+

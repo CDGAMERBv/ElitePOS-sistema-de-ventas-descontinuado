@@ -1,0 +1,156 @@
+﻿@using ElitePOS.Shared.Models
+@using ElitePOS.Services
+@implements IDisposable
+@inject INotificationService NotificationService
+
+@if (visible)
+{
+    var bgColor = messageType switch
+    {
+        NotificationType.Success => "#10b981",
+        NotificationType.Error => "#dc2626",
+        NotificationType.Warning => "#fbbf24",
+        _ => "#1e293b"
+    };
+
+    var iconClass = messageType switch
+    {
+        NotificationType.Success => "bi-check-circle-fill",
+        NotificationType.Error => "bi-exclamation-circle-fill",
+        NotificationType.Warning => "bi-exclamation-triangle-fill",
+        _ => "bi-info-circle-fill"
+    };
+
+    var textColor = messageType switch
+    {
+        NotificationType.Success => "#065f46",
+        NotificationType.Error => "#7f1d1d",
+        NotificationType.Warning => "#92400e",
+        _ => "#1e293b"
+    };
+
+    var iconColor = messageType switch
+    {
+        NotificationType.Success => "#10b981",
+        NotificationType.Error => "#dc2626",
+        NotificationType.Warning => "#fbbf24",
+        _ => "#4f46e5"
+    };
+
+    var softBgColor = messageType switch
+    {
+        NotificationType.Success => "#d1fae5",
+        NotificationType.Error => "#fee2e2",
+        NotificationType.Warning => "#fef3c7",
+        _ => "#e0e7ff"
+    };
+
+    <div class="@(ocultando ? "global-toast toast-fade-out" : "global-toast toast-slide-in")" 
+         style="position: fixed; top: 24px; right: 24px; z-index: 10000; background: white; border-left: 5px solid @bgColor; border-radius: 12px; padding: 18px 24px; min-width: 350px; max-width: 450px; box-shadow: 0 15px 35px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 16px;">
+        
+        <div style="width: 36px; height: 36px; border-radius: 50%; background: @softBgColor; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span class="bi @iconClass" style="font-size: 20px; color: @iconColor;"></span>
+        </div>
+
+        <div style="flex: 1;">
+            <p style="margin: 0; color: @textColor; font-size: 15px; font-weight: 600; line-height: 1.4;">@mensaje</p>
+        </div>
+
+        <button @onclick="Ocultar" style="background: none; border: none; color: #9ca3af; cursor: pointer; padding: 6px; line-height: 1; font-size: 18px; transition: all 0.2s;" onmouseover="this.style.color='#4b5563'" onmouseout="this.style.color='#9ca3af'">
+            <span class="bi bi-x-lg"></span>
+        </button>
+    </div>
+}
+
+<style>
+    .global-toast {
+        transition: all 0.3s ease;
+    }
+
+    .toast-slide-in {
+        animation: toast-slide-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    .toast-fade-out {
+        animation: toast-fade-out 0.3s ease-out forwards;
+    }
+
+    @@keyframes toast-slide-in {
+        from {
+            opacity: 0;
+            transform: translateX(100%) scale(0.9);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+    }
+
+    @@keyframes toast-fade-out {
+        from {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+        to {
+            opacity: 0;
+            transform: translateX(100%) scale(0.9);
+        }
+    }
+</style>
+
+@code {
+    private bool visible = false;
+    private bool ocultando = false;
+    private string mensaje = "";
+    private NotificationType messageType;
+    private System.Threading.Timer? timer;
+
+    protected override void OnInitialized()
+    {
+        NotificationService.OnNotification += MostrarNotificacion;
+    }
+
+    private void MostrarNotificacion(NotificationMessage notification)
+    {
+        InvokeAsync(() =>
+        {
+            mensaje = notification.Message;
+            messageType = notification.Type;
+            visible = true;
+            ocultando = false;
+            StateHasChanged();
+
+            timer?.Dispose();
+            timer = new System.Threading.Timer(_ => 
+            {
+                InvokeAsync(OcultarConAnimacion);
+            }, null, notification.Duration, System.Threading.Timeout.Infinite);
+        });
+    }
+
+    private async Task OcultarConAnimacion()
+    {
+        ocultando = true;
+        StateHasChanged();
+        await Task.Delay(300);
+        visible = false;
+        ocultando = false;
+        StateHasChanged();
+    }
+
+    private void Ocultar()
+    {
+        _ = OcultarConAnimacion();
+    }
+
+    public void Dispose()
+    {
+        NotificationService.OnNotification -= MostrarNotificacion;
+        timer?.Dispose();
+    }
+}
+
+
+
+
+

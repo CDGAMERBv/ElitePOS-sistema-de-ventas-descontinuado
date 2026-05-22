@@ -1,0 +1,23 @@
+2026/03/19-20:42:03.851 2e98 Creating DB C:\Users\UserHp\source\repos\ElitePOS\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb since it was missing.
+2026/03/19-20:42:03.862 2e98 Reusing MANIFEST C:\Users\UserHp\source\repos\ElitePOS\whatsapp-bot\.wwebjs_auth\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/03/19-20:43:31.283 276c Level-0 table #5: started
+2026/03/19-20:43:31.311 276c Level-0 table #5: 1072477 bytes OK
+2026/03/19-20:43:31.314 276c Delete type=0 #3
+2026/03/19-20:43:33.434 2e98 Level-0 table #7: started
+2026/03/19-20:43:33.462 2e98 Level-0 table #7: 1107002 bytes OK
+2026/03/19-20:43:33.467 2e98 Delete type=0 #4
+2026/03/19-20:43:33.478 1eb8 Compacting 1@1 + 1@2 files
+2026/03/19-20:43:33.518 1eb8 Generated table #8@1: 22203 keys, 996633 bytes
+2026/03/19-20:43:33.518 1eb8 Compacted 1@1 + 1@2 files => 996633 bytes
+2026/03/19-20:43:33.520 1eb8 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/03/19-20:43:33.520 1eb8 Delete type=2 #5
+2026/03/19-20:43:33.520 1eb8 Delete type=2 #7
+2026/03/19-20:44:13.709 1eb8 Level-0 table #10: started
+2026/03/19-20:44:13.732 1eb8 Level-0 table #10: 1088236 bytes OK
+2026/03/19-20:44:13.735 1eb8 Delete type=0 #6
+2026/03/19-20:44:13.973 1eb8 Compacting 1@1 + 1@2 files
+2026/03/19-20:44:14.016 1eb8 Generated table #11@1: 31084 keys, 1442378 bytes
+2026/03/19-20:44:14.017 1eb8 Compacted 1@1 + 1@2 files => 1442378 bytes
+2026/03/19-20:44:14.019 1eb8 compacted to: files[ 0 0 1 0 0 0 0 ]
+2026/03/19-20:44:14.020 1eb8 Delete type=2 #8
+2026/03/19-20:44:14.020 1eb8 Delete type=2 #10

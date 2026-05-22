@@ -1,0 +1,518 @@
+@page "/clientes"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Services
+@using ElitePOS.Client.Services
+@using Microsoft.AspNetCore.Components.Forms
+@inject IClientesService ClientesService
+@inject IValidacionDocumentosService ValidacionService
+@inject INotificationService NotificationService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+
+<div class="dashboard-premium px-4 py-6" style="padding: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px;">
+        <div>
+            <h3 style="font-weight: 800; font-size: 24px; margin: 0; color: #111827;">Gestión de Clientes</h3>
+        </div>
+        <div>
+            <button class="btn btn-primary" style="background-color: #4F46E5; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;" @onclick="AbrirModalAgregar">
+                <i class="bi bi-person-plus-fill" style="margin-right: 8px;"></i> Agregar Cliente
+            </button>
+        </div>
+    </div>
+
+    <!-- Búsqueda -->
+    <div class="glass-card" style="padding: 20px; margin-bottom: 24px; display: flex; gap: 16px;">
+        <div style="flex: 1;">
+            <label style="display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;">Búsqueda de Clientes</label>
+            <div style="position: relative;">
+                <i class="bi bi-search" style="position: absolute; left: 12px; top: 12px; color: #94A3B8;"></i>
+                <input type="text" @bind="textoBusqueda" @bind:event="oninput" @onkeyup="FiltrarClientes" placeholder="Buscar por nombre, DNI o celular..." style="width: 100%; padding: 10px 10px 10px 36px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none; transition: border-color 0.2s;" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Clientes -->
+    <div class="glass-card" style="padding: 24px; overflow-x: auto;">
+        <h5 style="font-weight: 700; margin: 0 0 16px 0; font-size: 16px; color: #111827;">Lista de Clientes</h5>
+
+        @if (cargando)
+        {
+            <div style="text-align: center; padding: 40px 0;">
+                <p style="color: #6B7280;">Cargando clientes...</p>
+            </div>
+        }
+        else if (clientesFiltrados == null || !clientesFiltrados.Any())
+        {
+            <div style="text-align: center; padding: 40px 0;">
+                <i class="bi bi-people" style="font-size: 40px; color: #94A3B8; margin-bottom: 12px; display: block;"></i>
+                <p style="color: #6B7280; font-weight: 500;">@(string.IsNullOrWhiteSpace(textoBusqueda) ? "No hay clientes registrados" : "No se encontraron clientes")</p>
+            </div>
+        }
+        else
+        {
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align: center; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0; width: 60px;">FOTO</th>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">DNI/RUC</th>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">NOMBRE</th>
+                        <th style="text-align: left; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">CELULAR</th>
+                        <th style="text-align: right; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">DEUDA</th>
+                        <th style="text-align: center; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">ESTADO</th>
+                        <th style="text-align: right; font-weight: 600; color: #6B7280; font-size: 12px; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">ACCIONES</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var cliente in clientesFiltrados)
+                    {
+                        <tr>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #F1F5F9; text-align: center;">
+                                <img src="@(string.IsNullOrWhiteSpace(cliente.fotoUrl) ? "icons/user-default.png" : cliente.fotoUrl)" alt="Foto" style="width:40px;height:40px;border-radius:50%;object-fit:cover; border: 2px solid #E2E8F0;" />
+                            </td>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #F1F5F9; color: #6B7280; font-size: 14px; font-weight: 500;">@cliente.dniRuc</td>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #F1F5F9; font-weight: 600; color: #111827; font-size: 14px;">@cliente.nombre</td>
+                            <td style="padding: 12px 0; border-bottom: 1px solid #F1F5F9; color: #6B7280; font-size: 14px;">@cliente.telefono</td>
+                            <td style="text-align: right; padding: 12px 0; border-bottom: 1px solid #F1F5F9; font-weight: 700; font-size: 14px; color: @(cliente.deuda > 0 ? "#EF4444" : "#10B981")">S/ @cliente.deuda.ToString("N2")</td>
+                            <td style="text-align: center; padding: 12px 0; border-bottom: 1px solid #F1F5F9;">
+                                <span style="background: @(cliente.anulado ? "rgba(239,68,68,0.1)" : "rgba(16,185,129,0.1)"); color: @(cliente.anulado ? "#EF4444" : "#10B981"); padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 11px;">
+                                    @(cliente.anulado ? "ANULADO" : "ACTIVO")
+                                </span>
+                            </td>
+                            <td style="text-align: right; padding: 12px 0; border-bottom: 1px solid #F1F5F9;">
+                                <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                                    <button @onclick="() => AbrirModalEditar(cliente)" style="background: rgba(16, 185, 129, 0.1); color: #10B981; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;"><i class="bi bi-pencil-fill"></i> Editar</button>
+                                    <button @onclick="() => AbrirModalEliminar(cliente)" style="background: rgba(239, 68, 68, 0.1); color: #EF4444; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;"><i class="bi bi-trash-fill"></i> Eliminar</button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<!-- Estilos base para modales nativos -->
+<style>
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(15, 23, 42, 0.6);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+    .modal-content {
+        background: #FFFFFF;
+        border-radius: 16px;
+        padding: 24px;
+        width: 100%;
+        max-width: 500px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+    .form-group {
+        margin-bottom: 16px;
+    }
+    .form-control {
+        width: 100%; padding: 10px; border: 1px solid #E2E8F0; border-radius: 8px; outline: none;
+    }
+    .form-control:focus {
+        border-color: #4F46E5;
+        box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+    }
+    .form-label {
+        display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 6px;
+    }
+    .photo-upload-container {
+        display: flex; flex-direction: column; align-items: center; justify-content: center; margin-bottom: 24px;
+    }
+    .photo-upload-label {
+        margin-top: 12px; color: #4F46E5; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 6px; background: rgba(79, 70, 229, 0.1); transition: background 0.2s;
+    }
+    .photo-upload-label:hover {
+        background: rgba(79, 70, 229, 0.15);
+    }
+</style>
+
+<!-- Modal Agregar -->
+@if (mostrarModalAgregar)
+{
+    <div class="modal-overlay" @onclick="CerrarModalAgregar">
+        <div class="modal-content" @onclick:stopPropagation>
+            <h5 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700; color: #111827;">Agregar Cliente</h5>
+            
+            <div class="photo-upload-container">
+                <InputFile id="fileInputAgregar" OnChange="CargarFotoAgregar" accept="image/*" style="display:none;" />
+                <img src="@(string.IsNullOrWhiteSpace(nuevoCliente.fotoUrl) ? "icons/user-default.png" : nuevoCliente.fotoUrl)" style="width:80px;height:80px;border-radius:50%;object-fit:cover; border: 3px solid #E2E8F0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);" />
+                <label for="fileInputAgregar" class="photo-upload-label"><i class="bi bi-camera"></i> Subir Foto</label>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">DNI / RUC</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" class="form-control" @bind="nuevoCliente.dniRuc" placeholder="Número de documento" />
+                    <button @onclick="ValidarDocumentoNuevo" disabled="@validandoDocumento" style="background: #4F46E5; border: none; padding: 0 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer; white-space: nowrap;">
+                        @(validandoDocumento ? "..." : "Validar")
+                    </button>
+                </div>
+                @if (!string.IsNullOrEmpty(mensajeValidacion))
+                {
+                    <small style="display: block; margin-top: 6px; color: @(validacionExitosa ? "#10B981" : "#EF4444"); font-weight: 500;">@mensajeValidacion</small>
+                }
+            </div>
+
+            <div class="form-group"><label class="form-label">Nombre Completo o Razón Social *</label><input type="text" class="form-control" @bind="nuevoCliente.nombre" /></div>
+            <div class="form-group"><label class="form-label">Teléfono</label><input type="text" class="form-control" @bind="nuevoCliente.telefono" /></div>
+            <div class="form-group"><label class="form-label">Dirección</label><textarea class="form-control" @bind="nuevoCliente.direccion" rows="2"></textarea></div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                <button @onclick="CerrarModalAgregar" style="background: white; border: 1px solid #E2E8F0; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: #475569; cursor: pointer;">Cancelar</button>
+                <button @onclick="GuardarNuevoCliente" style="background: #4F46E5; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer;">Guardar Cliente</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Editar -->
+@if (mostrarModalEditar)
+{
+    <div class="modal-overlay" @onclick="CerrarModalEditar">
+        <div class="modal-content" @onclick:stopPropagation>
+            <h5 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700; color: #111827;">Editar Cliente</h5>
+            
+            <div class="photo-upload-container">
+                <InputFile id="fileInputEditar" OnChange="CargarFotoEditar" accept="image/*" style="display:none;" />
+                <img src="@(string.IsNullOrWhiteSpace(clienteEditando.fotoUrl) ? "icons/user-default.png" : clienteEditando.fotoUrl)" style="width:80px;height:80px;border-radius:50%;object-fit:cover; border: 3px solid #E2E8F0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);" />
+                <label for="fileInputEditar" class="photo-upload-label"><i class="bi bi-camera"></i> Cambiar Foto</label>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">DNI / RUC</label>
+                <div style="display: flex; gap: 8px;">
+                    <input type="text" class="form-control" @bind="clienteEditando.dniRuc" />
+                    <button @onclick="ValidarDocumentoEditando" disabled="@validandoDocumento" style="background: #4F46E5; border: none; padding: 0 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer; white-space: nowrap;">
+                        @(validandoDocumento ? "..." : "Validar")
+                    </button>
+                </div>
+                @if (!string.IsNullOrEmpty(mensajeValidacion))
+                {
+                    <small style="display: block; margin-top: 6px; color: @(validacionExitosa ? "#10B981" : "#EF4444"); font-weight: 500;">@mensajeValidacion</small>
+                }
+            </div>
+
+            <div class="form-group"><label class="form-label">Nombre Completo o Razón Social *</label><input type="text" class="form-control" @bind="clienteEditando.nombre" /></div>
+            <div class="form-group"><label class="form-label">Teléfono</label><input type="text" class="form-control" @bind="clienteEditando.telefono" /></div>
+            <div class="form-group"><label class="form-label">Dirección</label><textarea class="form-control" @bind="clienteEditando.direccion" rows="2"></textarea></div>
+            
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" @bind="clienteEditando.anulado" style="width: 18px; height: 18px;" />
+                    <span style="font-size: 14px; font-weight: 600; color: #EF4444;">Marcar como Inactivo / Anulado</span>
+                </label>
+            </div>
+            
+            <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px;">
+                <button @onclick="CerrarModalEditar" style="background: white; border: 1px solid #E2E8F0; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: #475569; cursor: pointer;">Cancelar</button>
+                <button @onclick="GuardarEdicion" style="background: #10B981; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer;">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal Eliminar -->
+@if (mostrarModalEliminar && clienteAEliminar != null)
+{
+    <div class="modal-overlay" @onclick="CerrarModalEliminar">
+        <div class="modal-content" @onclick:stopPropagation style="text-align: center; max-width: 400px;">
+            <div style="width: 64px; height: 64px; border-radius: 50%; background: rgba(239, 68, 68, 0.1); color: #EF4444; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 32px;">
+                <i class="bi bi-exclamation-triangle"></i>
+            </div>
+            <h5 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 700; color: #111827;">¿Eliminar cliente?</h5>
+            <p style="margin: 0 0 24px 0; color: #6B7280; line-height: 1.5;">Estás a punto de eliminar a <strong style="color: #111827;">@clienteAEliminar.nombre</strong>. Esta acción no se puede deshacer.</p>
+            
+            <div style="display: flex; justify-content: center; gap: 12px;">
+                <button @onclick="CerrarModalEliminar" style="background: white; border: 1px solid #E2E8F0; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: #475569; cursor: pointer;">Cancelar</button>
+                <button @onclick="ConfirmarEliminacion" style="background: #EF4444; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; color: white; cursor: pointer;">Eliminar Cliente</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ClienteModel> clientes = new List<ClienteModel>();
+    private List<ClienteModel> clientesFiltrados = new List<ClienteModel>();
+    private ClienteModel nuevoCliente = new ClienteModel { id = Guid.NewGuid().ToString() };
+    private ClienteModel clienteEditando = new ClienteModel();
+    private ClienteModel? clienteAEliminar = null;
+
+    private string textoBusqueda = string.Empty;
+    private bool cargando = true;
+    private bool mostrarModalAgregar = false;
+    private bool mostrarModalEditar = false;
+    private bool mostrarModalEliminar = false;
+
+    private string mensaje = string.Empty;
+    private bool mostrarToast = false;
+    private bool ocultandoToast = false;
+
+    private bool validandoDocumento = false;
+    private bool validacionExitosa = false;
+    private string mensajeValidacion = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CargarClientes();
+    }
+
+    private async Task CargarClientes()
+    {
+        cargando = true;
+        StateHasChanged();
+
+        try
+        {
+            var clientesObtenidos = await ClientesService.ObtenerClientes();
+            clientes = clientesObtenidos.ToList();
+            FiltrarClientes();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error al cargar clientes: {ex.Message}");
+        }
+        finally
+        {
+            cargando = false;
+            StateHasChanged();
+        }
+    }
+
+    private void FiltrarClientes()
+    {
+        if (string.IsNullOrWhiteSpace(textoBusqueda))
+        {
+            clientesFiltrados = clientes;
+        }
+        else
+        {
+            var busqueda = textoBusqueda.ToLower().Trim();
+            clientesFiltrados = clientes.Where(c =>
+                (c.dniRuc != null && c.dniRuc.ToLower().Contains(busqueda)) ||
+                (c.nombre != null && c.nombre.ToLower().Contains(busqueda)) ||
+                (c.telefono != null && c.telefono.ToLower().Contains(busqueda))
+            ).ToList();
+        }
+        StateHasChanged();
+    }
+
+    private void AbrirModalAgregar()
+    {
+        nuevoCliente = new ClienteModel { id = Guid.NewGuid().ToString() };
+        mensajeValidacion = string.Empty;
+        mostrarModalAgregar = true;
+        StateHasChanged();
+    }
+
+    private void CerrarModalAgregar()
+    {
+        mostrarModalAgregar = false;
+        StateHasChanged();
+    }
+
+    private async Task GuardarNuevoCliente()
+    {
+        if (string.IsNullOrWhiteSpace(nuevoCliente.nombre)) return;
+
+        if (string.IsNullOrWhiteSpace(nuevoCliente.dniRuc))
+            nuevoCliente.dniRuc = "00000000";
+
+        try
+        {
+            var resultado = await ClientesService.AgregarCliente(nuevoCliente);
+            if (resultado)
+            {
+                await NotificationService.ShowSuccess($"Cliente '{nuevoCliente.nombre}' registrado con éxito");
+                await CargarClientes();
+                CerrarModalAgregar();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+    private void AbrirModalEditar(ClienteModel cliente)
+    {
+        clienteEditando = new ClienteModel
+        {
+            id = cliente.id, dniRuc = cliente.dniRuc, nombre = cliente.nombre,
+            telefono = cliente.telefono, direccion = cliente.direccion, fotoUrl = cliente.fotoUrl,
+            deuda = cliente.deuda, anulado = cliente.anulado, empresaId = cliente.empresaId
+        };
+        mensajeValidacion = string.Empty;
+        mostrarModalEditar = true;
+        StateHasChanged();
+    }
+
+    private void CerrarModalEditar()
+    {
+        mostrarModalEditar = false;
+        StateHasChanged();
+    }
+
+    private async Task GuardarEdicion()
+    {
+        if (string.IsNullOrWhiteSpace(clienteEditando.nombre)) return;
+
+        try
+        {
+            var resultado = await ClientesService.EditarCliente(clienteEditando);
+            if (resultado)
+            {
+                await NotificationService.ShowSuccess($"Datos de '{clienteEditando.nombre}' actualizados");
+                await CargarClientes();
+                CerrarModalEditar();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+    private void AbrirModalEliminar(ClienteModel cliente)
+    {
+        clienteAEliminar = cliente;
+        mostrarModalEliminar = true;
+        StateHasChanged();
+    }
+
+    private void CerrarModalEliminar()
+    {
+        mostrarModalEliminar = false;
+        clienteAEliminar = null;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmarEliminacion()
+    {
+        if (clienteAEliminar == null) return;
+
+        try
+        {
+            var resultado = await ClientesService.EliminarCliente(clienteAEliminar.id);
+            if (resultado)
+            {
+                await NotificationService.ShowSuccess($"Cliente '{clienteAEliminar.nombre}' eliminado");
+                await CargarClientes();
+                CerrarModalEliminar();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
+    }
+
+    private async Task CargarFotoAgregar(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            try
+            {
+                var buffer = new byte[file.Size];
+                await file.OpenReadStream(maxAllowedSize: 2 * 1024 * 1024).ReadAsync(buffer);
+                nuevoCliente.fotoUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(buffer)}";
+                StateHasChanged();
+            }
+            catch { }
+        }
+    }
+
+    private async Task CargarFotoEditar(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file != null)
+        {
+            try
+            {
+                var buffer = new byte[file.Size];
+                await file.OpenReadStream(maxAllowedSize: 2 * 1024 * 1024).ReadAsync(buffer);
+                clienteEditando.fotoUrl = $"data:{file.ContentType};base64,{Convert.ToBase64String(buffer)}";
+                StateHasChanged();
+            }
+            catch { }
+        }
+    }
+
+    private async Task ValidarDocumentoNuevo()
+    {
+        if (string.IsNullOrWhiteSpace(nuevoCliente.dniRuc)) return;
+        validandoDocumento = true;
+        mensajeValidacion = string.Empty;
+        StateHasChanged();
+        try
+        {
+            var resultado = await ValidacionService.ValidarDocumento(nuevoCliente.dniRuc);
+            if (resultado.esValido)
+            {
+                nuevoCliente.nombre = resultado.razonSocial;
+                nuevoCliente.direccion = resultado.direccion;
+                mensajeValidacion = $"✅ {resultado.mensaje}";
+                validacionExitosa = true;
+            }
+            else
+            {
+                mensajeValidacion = $"❌ {resultado.mensaje}";
+                validacionExitosa = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            mensajeValidacion = $"❌ Error: {ex.Message}";
+            validacionExitosa = false;
+        }
+        finally
+        {
+            validandoDocumento = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ValidarDocumentoEditando()
+    {
+        if (string.IsNullOrWhiteSpace(clienteEditando.dniRuc)) return;
+        validandoDocumento = true;
+        mensajeValidacion = string.Empty;
+        StateHasChanged();
+        try
+        {
+            var resultado = await ValidacionService.ValidarDocumento(clienteEditando.dniRuc);
+            if (resultado.esValido)
+            {
+                clienteEditando.nombre = resultado.razonSocial;
+                clienteEditando.direccion = resultado.direccion;
+                mensajeValidacion = $"✅ {resultado.mensaje}";
+                validacionExitosa = true;
+            }
+            else
+            {
+                mensajeValidacion = $"❌ {resultado.mensaje}";
+                validacionExitosa = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            mensajeValidacion = $"❌ Error: {ex.Message}";
+            validacionExitosa = false;
+        }
+        finally
+        {
+            validandoDocumento = false;
+            StateHasChanged();
+        }
+    }
+}

@@ -1,0 +1,151 @@
+﻿@page "/"
+@layout EmptyLayout
+@attribute [AllowAnonymous]
+@using ElitePOS.Client.Services
+@using ElitePOS.Shared.Models
+@using Microsoft.AspNetCore.Components.Forms
+@inject NavigationManager Navigation
+@inject ElitePOS.Services.ISesionService SesionService
+@inject IJSRuntime JSRuntime
+@inject ElitePOS.Services.IUsuariosService UsuariosService
+@inject ElitePOS.Services.IAuditoriaService AuditoriaService
+
+<style>
+    @@keyframes fadeInCard { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+</style>
+
+<div style="display: flex; justify-content: center; align-items: center; min-height: 100vh; width: 100vw; background-color: #0f172a; position: absolute; top: 0; left: 0; overflow: hidden;">
+    <div style="background: white; padding: 50px 60px; border-radius: 20px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); width: 100%; max-width: 480px; text-align: center; z-index: 10; animation: fadeInCard 0.6s ease-out both;">
+        
+        <div style="margin-bottom: 30px;">
+            <div style="background: #eff6ff; width: 80px; height: 80px; border-radius: 50%; display: flex; justify-content: center; align-items: center; margin: 0 auto 15px auto;">
+                <i class="bi bi-cart4" style="font-size: 2.5rem; color: #2563eb;"></i>
+            </div>
+            <h2 style="font-weight: 800; color: #1e293b; margin: 0;">ElitePOS</h2>
+            <p style="color: #64748b; margin-top: 5px;">Sistema de Gestión</p>
+        </div>
+
+        <EditForm Model="@_loginModel" OnValidSubmit="IniciarSesion">
+            <div style="text-align: left; margin-bottom: 20px;">
+                <label style="font-weight: 600; font-size: 14px; color: #475569; display: block; margin-bottom: 8px;">Usuario</label>
+                <div style="position: relative;">
+                    <i class="bi bi-person-fill" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 18px;"></i>
+                    <InputText @bind-Value="_loginModel.usuario" 
+                               placeholder="Ingrese su usuario" 
+                               disabled="@isLoggingIn"
+                               style="width: 100%; padding: 12px 12px 12px 45px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; outline: none;" />
+                </div>
+            </div>
+            
+            <div style="text-align: left; margin-bottom: 30px;">
+                <label style="font-weight: 600; font-size: 14px; color: #475569; display: block; margin-bottom: 8px;">Contraseña</label>
+                <div style="position: relative;">
+                    <i class="bi bi-key-fill" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 18px;"></i>
+                    <InputText type="password" 
+                               @bind-Value="_loginModel.contrasena" 
+                               placeholder="Ingrese su contraseña" 
+                               disabled="@isLoggingIn"
+                               style="width: 100%; padding: 12px 12px 12px 45px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; outline: none;" />
+                </div>
+            </div>
+            
+            <button type="submit" 
+                    disabled="@isLoggingIn"
+                    style="width: 100%; background: #2563eb; color: white; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s;">
+                @if (isLoggingIn)
+                {
+                    <span class="spinner-border spinner-border-sm"></span>
+                    <span> Cargando...</span>
+                }
+                else
+                {
+                    <span>Ingresar al Sistema</span>
+                }
+            </button>
+        </EditForm>
+        
+        @if (!string.IsNullOrEmpty(mensajeError))
+        {
+            <div style="margin-top: 15px; padding: 10px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; color: #dc2626; font-size: 14px;">
+                <i class="bi bi-exclamation-triangle" style="margin-right: 8px;"></i>
+                @mensajeError
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    public class LoginModel
+    {
+        public string usuario { get; set; } = "";
+        public string contrasena { get; set; } = "";
+    }
+
+    private LoginModel _loginModel = new LoginModel();
+    private string mensajeError = "";
+    private bool isLoggingIn = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await SesionService.CargarSesionDesdeStorage();
+        if (SesionService.usuarioActual != null && SesionService.usuarioActual.estaAutenticado)
+        {
+            Navigation.NavigateTo("/home");
+        }
+    }
+
+    private async Task IniciarSesion()
+    {
+        if (isLoggingIn) return;
+
+        if (string.IsNullOrEmpty(_loginModel.usuario) || string.IsNullOrEmpty(_loginModel.contrasena))
+        {
+            mensajeError = "Por favor, ingrese usuario y contraseña";
+            return;
+        }
+
+        try
+        {
+            isLoggingIn = true;
+            mensajeError = "";
+            StateHasChanged();
+
+            var usuarioEncontrado = await UsuariosService.AutenticarUsuario(_loginModel.usuario, _loginModel.contrasena);
+            
+            if (usuarioEncontrado != null)
+            {
+                await SesionService.IniciarSesion(
+                    usuarioEncontrado.nombre, 
+                    usuarioEncontrado.nombreCompleto, 
+                    usuarioEncontrado.correo, 
+                    usuarioEncontrado.rol, 
+                    usuarioEncontrado.empresaId
+                );
+
+                await AuditoriaService.RegistrarAccionAsync(new AuditoriaModel
+                {
+                    usuario = usuarioEncontrado.nombreCompleto,
+                    modulo = "Autenticación",
+                    accion = "Inicio de Sesión",
+                    detalle = "Acceso exitoso al sistema",
+                    fechaHora = DateTime.Now,
+                    empresaId = usuarioEncontrado.empresaId ?? ""
+                });
+
+                Navigation.NavigateTo("/home");
+            }
+            else
+            {
+                mensajeError = "Usuario o contraseña incorrectos";
+            }
+        }
+        catch (Exception ex)
+        {
+            mensajeError = "Error: " + ex.Message;
+        }
+        finally
+        {
+            isLoggingIn = false;
+        }
+    }
+}

@@ -1,0 +1,11 @@
+Codigo,Producto,Precio_Compra,Precio_Venta,Stock_Actual,Categoria
+PROD001,Laptop HP 15,450.00,650.00,10,Electrónica
+PROD002,Mouse Inalámbrico,8.50,15.00,50,Accesorios
+PROD003,Teclado Mecánico,35.00,55.00,25,Accesorios
+PROD004,Monitor LG 24",120.00,180.00,15,Electrónica
+PROD005,Cable HDMI 2m,5.00,12.00,100,Cables
+PROD006,Audífonos Bluetooth,25.00,45.00,30,Audio
+PROD007,Cargador USB-C,8.00,18.00,75,Accesorios
+PROD008,Webcam HD,30.00,50.00,20,Periféricos
+PROD009,Disco Duro 1TB,45.00,75.00,40,Almacenamiento
+PROD010,Memoria RAM 8GB,28.00,48.00,35,Componentes

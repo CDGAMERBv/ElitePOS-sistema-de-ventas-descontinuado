@@ -1,0 +1,113 @@
+using ElitePOS.Models;
+using Microsoft.JSInterop;
+
+namespace ElitePOS.Services
+{
+    public class SesionService : ISesionService
+    {
+        private SesionUsuarioModel _usuarioActual = new();
+        private readonly IJSRuntime? _jsRuntime;
+        private bool _mostrarCargaInicial = false;
+
+        public SesionUsuarioModel UsuarioActual => _usuarioActual;
+
+        public event Action? OnSesionCambiada;
+
+        public SesionService(IJSRuntime jsRuntime)
+        {
+            _jsRuntime = jsRuntime;
+            // Ya no iniciamos sesión automática - se requiere login
+        }
+
+        // previously had compatibility methods for initial splash; removed
+
+        public async Task IniciarSesion(string usuarioId, string nombre, string correo, string rol, string empresaId)
+        {
+            _usuarioActual = new SesionUsuarioModel
+            {
+                UsuarioId = usuarioId,
+                Nombre = nombre,
+                Correo = correo,
+                Rol = rol.ToUpper(),
+                EmpresaId = empresaId,
+                EstaAutenticado = true
+            };
+
+            // Guardar en localStorage
+            if (_jsRuntime != null)
+            {
+                await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "sesion_usuario", System.Text.Json.JsonSerializer.Serialize(_usuarioActual));
+            }
+
+            Console.WriteLine($"✅ Sesión iniciada: {nombre} ({rol})");
+            OnSesionCambiada?.Invoke();
+        }
+
+        public void CerrarSesion()
+        {
+            _usuarioActual = new SesionUsuarioModel();
+
+            // Limpiar localStorage
+            if (_jsRuntime != null)
+            {
+                try
+                {
+                    _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "sesion_usuario");
+                }
+                catch { /* Ignorar errores */ }
+            }
+
+            Console.WriteLine("🚪 Sesión cerrada");
+            OnSesionCambiada?.Invoke();
+        }
+
+        public async Task CargarSesionDesdeStorage()
+        {
+            if (_jsRuntime == null) return;
+
+            try
+            {
+                var sesionJson = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "sesion_usuario");
+
+                if (!string.IsNullOrEmpty(sesionJson))
+                {
+                    var sesion = System.Text.Json.JsonSerializer.Deserialize<SesionUsuarioModel>(sesionJson);
+                    if (sesion != null && sesion.EstaAutenticado)
+                    {
+                        _usuarioActual = sesion;
+                        Console.WriteLine($"✅ Sesión recuperada: {sesion.Nombre} ({sesion.Rol})");
+                        OnSesionCambiada?.Invoke();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Error al cargar sesión: {ex.Message}");
+            }
+        }
+
+        public bool TieneAcceso(string modulo)
+        {
+            if (!_usuarioActual.EstaAutenticado)
+                return false;
+
+            // ADMIN tiene acceso a todo
+            if (_usuarioActual.EsAdministrador)
+                return true;
+
+            // CAJERO solo tiene acceso limitado
+            var modulosPermitidosCajero = new[]
+            {
+                "ventas",
+                "compras",
+                "inventario",
+                "historial-ventas",
+                "historial-compras",
+                "historial-proformas",
+                "clientes"
+            };
+
+            return modulosPermitidosCajero.Contains(modulo.ToLower());
+        }
+    }
+}

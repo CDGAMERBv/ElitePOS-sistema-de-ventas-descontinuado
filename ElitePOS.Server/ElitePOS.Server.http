@@ -1,0 +1,6 @@
+@ElitePOS.Server_HostAddress = http://localhost:5183
+
+GET {{ElitePOS.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

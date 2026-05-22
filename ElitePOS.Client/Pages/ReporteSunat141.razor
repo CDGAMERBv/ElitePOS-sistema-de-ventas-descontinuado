@@ -1,0 +1,70 @@
+﻿@page "/reporte-sunat-141"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Client.Services
+@inject ElitePOS.Services.IComprobanteSunatService SunatService
+@inject ElitePOS.Client.Services.INotificationService NotificationService
+@inject IJSRuntime JSRuntime
+
+<div style="padding: 24px; background: #f8fafc; min-height: 100vh;">
+    <div style="margin-bottom: 32px;">
+        <h1 style="font-size: 28px; font-weight: 800; color: #1e293b; margin: 0;">Reporte Sunat 1.4.1</h1>
+        <p style="color: #64748b; margin: 4px 0 0 0;">Validación y estado de envíos a SUNAT</p>
+    </div>
+
+    <div style="background: white; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+        <div style="display: flex; gap: 16px; margin-bottom: 24px;">
+            <input type="date" @bind="Fecha" style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 8px;" />
+            <button style="padding: 10px 24px; background: #1e293b; color: white; border: none; border-radius: 8px; font-weight: 700; cursor: pointer;"
+                    @onclick="Cargar">Consultar</button>
+        </div>
+
+        @if (Cargando)
+        {
+            <div style="display: flex; justify-content: center; padding: 50px;">
+                <div class="spinner-border text-primary" role="status"></div>
+            </div>
+        }
+        else
+        {
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #f1f5f9; text-align: left;">
+                        <th style="padding: 12px; color: #64748b;">Comprobante</th>
+                        <th style="padding: 12px; color: #64748b;">ClienteModel</th>
+                        <th style="padding: 12px; color: #64748b; text-align: right;">Total</th>
+                        <th style="padding: 12px; color: #64748b; text-align: center;">Estado Sunat</th>
+                        <th style="padding: 12px; color: #64748b;">Mensaje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var v in Ventas)
+                    {
+                        <tr style="border-bottom: 1px solid #f8fafc;">
+                            <td style="padding: 12px; font-weight: 600;">@v.numeroComprobante</td>
+                            <td style="padding: 12px;">@v.cliente</td>
+                            <td style="padding: 12px; text-align: right;">S/ @v.total.ToString("N2")</td>
+                            <td style="padding: 12px; text-align: center;">
+                                <span style="padding: 4px 10px; border-radius: 8px; font-size: 11px; font-weight: 700; background: @(v.estadoSunat == "ACEPTADO" ? "#ecfdf5" : "#fff7ed"); color: @(v.estadoSunat == "ACEPTADO" ? "#10b981" : "#d97706");">
+                                    @v.estadoSunat
+                                </span>
+                            </td>
+                            <td style="padding: 12px; font-size: 11px; color: #64748b;">@v.mensajeSunat</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@code {
+    private DateTime Fecha = DateTime.Today;
+    private List<VentaModel> Ventas = new();
+    private bool Cargando = false;
+
+    private async Task Cargar()
+    {
+        try { Cargando = true; Ventas = (await SunatService.ObtenerEstadoEnvios(Fecha)).ToList(); }
+        finally { Cargando = false; }
+    }
+}

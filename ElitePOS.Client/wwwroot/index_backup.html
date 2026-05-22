@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ElitePOS</title>
+    <base href="/" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="ElitePOS.styles.css" rel="stylesheet" />
+    <link href="manifest.webmanifest" rel="manifest" />
+    <link rel="apple-touch-icon" sizes="512x512" href="icon-512.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png" />
+
+    <link href="css/bootstrap-icons.min.css" rel="stylesheet" />
+</head>
+
+<body>
+    <div id="splash-screen">
+        <div class="splash-content">
+            <div class="splash-logo">
+                <img src="icons/carrito-login.png" alt="ElitePOS" />
+            </div>
+            <h1 class="splash-title">ElitePOS</h1>
+            <p class="splash-subtitle">Cargando sistema...</p>
+
+            <div class="progress-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <p class="progress-text" id="progress-text">0%</p>
+        </div>
+    </div>
+
+    <div id="app"></div>
+
+    <div id="blazor-error-ui">
+        An unhandled error has occurred.
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="js/qrcode.min.js"></script>
+
+    <script>
+        window.exportarAExcel = function(jsonData, nombreArchivo) {
+            try {
+                const datos = JSON.parse(jsonData);
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(datos);
+                const wscols = [
+                    {wch: 18}, {wch: 15}, {wch: 25}, {wch: 12},
+                    {wch: 12}, {wch: 12}, {wch: 10}
+                ];
+                ws['!cols'] = wscols;
+                XLSX.utils.book_append_sheet(wb, ws, "Ventas");
+                XLSX.writeFile(wb, nombreArchivo + ".xlsx");
+                console.log("✅ Excel exportado exitosamente");
+            } catch (error) {
+                console.error("❌ Error al exportar Excel:", error);
+                alert("Error al exportar: " + error.message);
+            }
+        };
+
+        window.isOnline = function() {
+            return navigator.onLine;
+        };
+
+        window.descargarBackup = function(jsonData, nombreArchivo) {
+            try {
+                const blob = new Blob([jsonData], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = nombreArchivo + '.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                console.log('✅ Backup descargado: ' + nombreArchivo + '.json');
+            } catch (error) {
+                console.error('❌ Error al descargar backup:', error);
+                alert('Error al descargar backup: ' + error.message);
+            }
+        };
+    </script>
+
+    <script>
+        (function() {
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('progress-text');
+            const splashScreen = document.getElementById('splash-screen');
+            let progress = 0;
+            let totalBytes = 0;
+            let loadedBytes = 0;
+
+            window.ocultarSplashScreen = function() {
+                if (progressBar) progressBar.style.width = '100%';
+                if (progressText) progressText.textContent = '100%';
+
+                if (splashScreen && splashScreen.parentNode) {
+                    splashScreen.parentNode.removeChild(splashScreen);
+                    console.log('✅ Splash screen eliminada');
+                }
+            };
+
+            window.iniciarBlazorConProgreso = function() {
+                if (typeof Blazor === 'undefined') {
+                    console.error('❌ ERROR: Blazor no está definido');
+                    if (progressText) progressText.textContent = 'Error al cargar Blazor';
+                    return;
+                }
+
+                console.log('✅ Blazor detectado, iniciando...');
+
+                Blazor.start({
+                    loadBootResource: function (type, name, defaultUri, integrity) {
+                        return fetch(defaultUri, { integrity: integrity, cache: 'no-cache' })
+                            .then(function(response) {
+                                const contentLength = response.headers.get('Content-Length');
+                                if (contentLength) {
+                                    const size = parseInt(contentLength, 10);
+                                    totalBytes += size;
+                                }
+
+                                const reader = response.clone().body.getReader();
+                                let receivedBytes = 0;
+
+                                return new Response(
+                                    new ReadableStream({
+                                        start: function(controller) {
+                                            function push() {
+                                                reader.read().then(function(result) {
+                                                    if (result.done) {
+                                                        controller.close();
+                                                        return;
+                                                    }
+                                                    receivedBytes += result.value.byteLength;
+                                                    loadedBytes += result.value.byteLength;
+
+                                                    if (totalBytes > 0 && progressBar && progressText) {
+                                                        progress = Math.min(95, (loadedBytes / totalBytes) * 100);
+                                                        progressBar.style.width = progress + '%';
+                                                        progressText.textContent = Math.floor(progress) + '%';
+                                                    }
+
+                                                    controller.enqueue(result.value);
+                                                    push();
+                                                }).catch(function(err) {
+                                                    console.error('Error al leer recurso:', err);
+                                                    controller.error(err);
+                                                });
+                                            }
+                                            push();
+                                        }
+                                    })
+                                );
+                            });
+                    }
+                }).catch(function(error) {
+                    console.error('❌ Error al iniciar Blazor:', error);
+                    if (progressText) progressText.textContent = 'Error: ' + error.message;
+                });
+            };
+
+            setTimeout(function() {
+                if (splashScreen && splashScreen.parentNode) {
+                    console.warn('⚠️ Splash screen eliminada por timeout (8s)');
+                    window.ocultarSplashScreen();
+                }
+            }, 8000);
+        })();
+    </script>
+
+    <script src="_framework/blazor.webassembly.js" autostart="false" onload="window.iniciarBlazorConProgreso()"></script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js');
+        }
+    </script>
+
+</body>
+
+</html>

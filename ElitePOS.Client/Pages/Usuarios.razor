@@ -1,0 +1,278 @@
+@page "/usuarios"
+@using ElitePOS.Shared.Models
+@using ElitePOS.Client.Services
+@using ElitePOS.Services
+@using Microsoft.JSInterop
+@inject IUsuariosService UsuariosService
+@inject ISesionService SesionService
+@inject INotificationService NotificationService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+
+<style>
+    /* ═══════════════════════════════════════════════════════════ */
+    /* 🏥 SURGICAL RECONSTRUCTION: USUARIOS PREMIUM v2.6         */
+    /* High-Fidelity Table & Password Policy Integration          */
+    /* ═══════════════════════════════════════════════════════════ */
+    .u-page { min-height: 100vh; background: #f8fafc; padding: 40px; }
+    .u-container { max-width: 1200px; margin: 0 auto; }
+    
+    .u-card { background: white; border-radius: 24px; padding: 32px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); border: 1px solid #f1f5f9; }
+    
+    /* Badges Style */
+    .u-badge { padding: 6px 12px; border-radius: 10px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid transparent; }
+    .u-badge-admin { background: #eff6ff; color: #1d4ed8; border-color: #dbeafe; }
+    .u-badge-cajero { background: #fffbeb; color: #b45309; border-color: #fef3c7; }
+    .u-badge-activo { background: #f0fdf4; color: #15803d; border-color: #dcfce7; }
+    .u-badge-inactivo { background: #fef2f2; color: #b91c1c; border-color: #fee2e2; }
+
+    /* Table Style */
+    .table-elite thead { background: #f8fafc; border-bottom: 2px solid #f1f5f9; }
+    .table-elite th { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; padding: 18px 24px; }
+    .table-elite td { padding: 20px 24px; font-size: 14px; vertical-align: middle; color: #334155; border-bottom: 1px solid #f8fafc; }
+    .table-elite tr:hover { background: #fcfdfe; }
+    
+    /* Buttons */
+    .btn-volver { padding: 10px 20px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; color: #64748b; font-weight: 800; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .btn-volver:hover { background: #f8fafc; color: #1e293b; transform: translateX(-4px); }
+
+    .btn-nuevo { background: #1e293b; color: white; border-radius: 14px; font-weight: 800; padding: 12px 28px; border: none; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.3s; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+    .btn-nuevo:hover { background: #0f172a; transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+
+    .btn-action { width: 38px; height: 38px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s; border: 1px solid #f1f5f9; background: #f8fafc; color: #64748b; cursor: pointer; }
+    .btn-action:hover { background: #ffffff; color: #1e293b; transform: translateY(-2px); border-color: #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+    .btn-action-delete:hover { color: #ef4444; border-color: #fee2e2; }
+
+    /* Modals */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(8px); z-index: 2000; display: flex; align-items: center; justify-content: center; animation: fadeIn 0.2s; }
+    .modal-content-elite { background: white; border-radius: 28px; padding: 40px; width: 90%; max-width: 500px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); animation: slideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+    
+    .form-label-elite { font-size: 11px; font-weight: 800; color: #94a3b8; margin-bottom: 8px; text-transform: uppercase; display: block; letter-spacing: 0.5px; }
+    .form-control-elite { width: 100%; padding: 14px 18px; border: 1.5px solid #f1f5f9; border-radius: 14px; font-size: 14px; transition: all 0.2s; background: #f8fafc; }
+    .form-control-elite:focus { border-color: #3b82f6; background: #ffffff; box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.08); outline: none; }
+
+    @@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+</style>
+
+<div class="u-page">
+    <div class="u-container">
+        
+        <!-- HEADER SECTION -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 48px;">
+            <div style="display: flex; gap: 24px; align-items: center;">
+                <button class="btn-volver" @onclick='() => Navigation.NavigateTo("/configuracion")'>
+                    <i class="bi bi-arrow-left"></i> VOLVER
+                </button>
+                <div style="border-left: 2px solid #e2e8f0; padding-left: 24px;">
+                    <h1 style="font-size: 32px; font-weight: 900; color: #0f172a; margin: 0; letter-spacing: -1px;">Gestión de Usuarios</h1>
+                    <p style="color: #64748b; font-size: 15px; font-weight: 500; margin-top: 4px;">Administración de identidades y privilegios</p>
+                </div>
+            </div>
+            
+            <button class="btn-nuevo" @onclick="MostrarNuevo">
+                <i class="bi bi-person-plus-fill" style="font-size: 18px;"></i> AGREGAR USUARIO
+            </button>
+        </div>
+
+        <!-- USERS TABLE CARD -->
+        <div class="u-card" style="padding: 0; overflow: hidden;">
+            <div style="overflow-x: auto;">
+                <table class="table mb-0 table-elite">
+                    <thead>
+                        <tr>
+                            <th>Nombre Completo</th>
+                            <th>Nombre de Usuario</th>
+                            <th>Correo Electrónico</th>
+                            <th style="text-align: center;">Rol Asignado</th>
+                            <th style="text-align: center;">Estado</th>
+                            <th style="text-align: right;">Operaciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (usuarios == null || !usuarios.Any())
+                        {
+                            <tr>
+                                <td colspan="6" style="text-align: center; padding: 60px; color: #94a3b8; font-weight: 600;">
+                                    <i class="bi bi-people" style="font-size: 40px; display: block; margin-bottom: 12px; opacity: 0.3;"></i>
+                                    No se encontraron usuarios registrados
+                                </td>
+                            </tr>
+                        }
+                        else
+                        {
+                            @foreach (var u in usuarios)
+                            {
+                                <tr>
+                                    <td style="font-weight: 800; color: #1e293b;">@u.nombreCompleto</td>
+                                    <td><span style="background: #f1f5f9; padding: 6px 10px; border-radius: 8px; font-family: monospace; font-weight: 800; color: #6366f1; font-size: 12px;">@@@u.nombreUsuario</span></td>
+                                    <td style="color: #64748b; font-weight: 500;">@u.correo</td>
+                                    <td style="text-align: center;">
+                                        <span class='u-badge @(u.rol == "Administrador" ? "u-badge-admin" : "u-badge-cajero")'>@u.rol</span>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        <span class='u-badge @(u.activo ? "u-badge-activo" : "u-badge-inactivo")'>
+                                            @(u.activo ? "Activo" : "Inactivo")
+                                        </span>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                                            <button class="btn-action" title="Editar" @onclick="() => Editar(u)"><i class="bi bi-pencil-fill"></i></button>
+                                            <button class="btn-action btn-action-delete" title="Eliminar" @onclick="() => Eliminar(u)"><i class="bi bi-trash3-fill"></i></button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- REGISTRATION MODAL -->
+@if (mostrarModal)
+{
+    <div class="modal-overlay">
+        <div class="modal-content-elite">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px;">
+                <div>
+                    <h2 style="font-size: 22px; font-weight: 900; color: #1e293b; margin: 0;">@(esEdicion ? "Actualizar Datos" : "Nuevo Usuario")</h2>
+                    <p style="font-size: 13px; color: #94a3b8; font-weight: 500; margin-top: 4px;">Completa los campos obligatorios (*)</p>
+                </div>
+                <button @onclick="() => mostrarModal = false" style="background: #f1f5f9; border: none; width: 40px; height: 40px; border-radius: 50%; color: #64748b; cursor: pointer; transition: all 0.2s;">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div style="grid-column: span 2;">
+                    <label class="form-label-elite">Nombre Completo *</label>
+                    <input type="text" @bind="usuarioActual.nombreCompleto" class="form-control-elite" placeholder="Ej. Ricardo Palma" />
+                </div>
+                <div>
+                    <label class="form-label-elite">Usuario *</label>
+                    <input type="text" @bind="usuarioActual.nombreUsuario" class="form-control-elite" placeholder="rpalma" />
+                </div>
+                <div>
+                    <label class="form-label-elite">Correo *</label>
+                    <input type="email" @bind="usuarioActual.correo" class="form-control-elite" placeholder="email@elite.com" />
+                </div>
+                <div>
+                    <label class="form-label-elite">Contraseña *</label>
+                    <input type="password" @bind="usuarioActual.contrasena" class="form-control-elite" placeholder="••••••••" />
+                </div>
+                <div>
+                    <label class="form-label-elite">Rol del Sistema</label>
+                    <select @bind="usuarioActual.rol" class="form-control-elite" style="appearance: auto;">
+                        <option value="Administrador">Administrador</option>
+                        <option value="Cajero">Cajero</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="margin-top: 24px; display: flex; align-items: center; gap: 12px; background: #f8fafc; padding: 16px; border-radius: 16px; border: 1px solid #f1f5f9;">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" @bind="usuarioActual.activo" id="swActivo" style="width: 44px; height: 22px; cursor: pointer;">
+                </div>
+                <label for="swActivo" style="font-size: 14px; font-weight: 700; color: #475569; cursor: pointer;">Usuario Activo / Permitir Acceso</label>
+            </div>
+
+            <div style="display: flex; gap: 16px; margin-top: 40px;">
+                <button class="btn" style="flex: 1; padding: 14px; border-radius: 14px; font-weight: 800; color: #64748b; background: #f1f5f9; border: none; font-size: 13px;" @onclick="() => mostrarModal = false">CANCELAR</button>
+                <button class="btn" style="flex: 1; padding: 14px; border-radius: 14px; font-weight: 800; color: white; background: #1e293b; border: none; font-size: 13px; display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 4px 12px rgba(30, 41, 59, 0.25);" @onclick="Guardar" disabled="@procesando">
+                    @if (procesando) { <span class="spinner-border spinner-border-sm"></span> }
+                    else { <i class="bi bi-shield-check"></i> }
+                    FUSIONAR DATOS
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<UsuarioModel> usuarios = new();
+    private UsuarioModel usuarioActual = new();
+    private bool mostrarModal = false;
+    private bool esEdicion = false;
+    private bool procesando = false;
+
+    protected override async Task OnInitializedAsync() => await CargarUsuarios();
+
+    private async Task CargarUsuarios()
+    {
+        try { usuarios = await UsuariosService.ObtenerUsuarios(); }
+        catch { await NotificationService.ShowError("Fallo crítico al recuperar usuarios"); }
+    }
+
+    private void MostrarNuevo() { usuarioActual = new UsuarioModel { activo = true, rol = "Cajero" }; esEdicion = false; mostrarModal = true; }
+    
+    private void Editar(UsuarioModel u) 
+    { 
+        usuarioActual = new UsuarioModel 
+        { 
+            id = u.id, 
+            empresaId = u.empresaId,
+            nombreCompleto = u.nombreCompleto, 
+            nombreUsuario = u.nombreUsuario, 
+            correo = u.correo, 
+            contrasena = u.contrasena,
+            rol = u.rol,
+            activo = u.activo
+        }; 
+        esEdicion = true; 
+        mostrarModal = true; 
+    }
+
+    private async Task Guardar()
+    {
+        if (string.IsNullOrWhiteSpace(usuarioActual.nombreCompleto) || 
+            string.IsNullOrWhiteSpace(usuarioActual.nombreUsuario) || 
+            string.IsNullOrWhiteSpace(usuarioActual.contrasena)) 
+        {
+            await NotificationService.ShowWarning("Campos obligatorios incompletos");
+            return;
+        }
+
+        if (usuarioActual.contrasena.Length < 6) 
+        {
+            await NotificationService.ShowWarning("La clave requiere mínimo 6 caracteres");
+            return;
+        }
+
+        try 
+        {
+            procesando = true;
+            // 🏢 SYNC GLOBAL: Garantizar que el usuario se vincule a la empresa actual
+            var sesion = SesionService.UsuarioActual;
+            usuarioActual.empresaId = sesion?.empresaId ?? "empresa-demo";
+
+            if (string.IsNullOrEmpty(usuarioActual.id)) usuarioActual.id = Guid.NewGuid().ToString();
+
+            var res = await UsuariosService.GuardarUsuario(usuarioActual);
+            if (res) 
+            {
+                await NotificationService.ShowSuccess("Identidad sincronizada con éxito ✨");
+                mostrarModal = false;
+                await CargarUsuarios();
+            }
+        } 
+        catch (Exception ex) { await NotificationService.ShowError("Error al guardar: " + ex.Message); }
+        finally { procesando = false; }
+    }
+
+    private async Task Eliminar(UsuarioModel u)
+    {
+        var confirm = await JSRuntime.InvokeAsync<bool>("confirm", $"¿Eliminar acceso para {u.nombreCompleto}? Esta acción es irreversible.");
+        if (confirm) 
+        {
+            var res = await UsuariosService.EliminarUsuario(u.id);
+            if (res) 
+            {
+                await NotificationService.ShowSuccess("Usuario removido del sistema");
+                await CargarUsuarios();
+            }
+        }
+    }
+}
